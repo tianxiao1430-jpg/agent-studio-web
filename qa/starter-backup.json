@@ -1,0 +1,1993 @@
+{
+  "schemaVersion": 1,
+  "draft": {
+    "id": "draft-7c1bff32",
+    "name": "研究与核验工作组",
+    "sourceVersion": "team-v2-candidate",
+    "nodes": [
+      {
+        "id": "node-input",
+        "kind": "input",
+        "label": "研究任务",
+        "position": {
+          "x": 70,
+          "y": 0
+        }
+      },
+      {
+        "id": "node-researcher",
+        "kind": "agent",
+        "label": "研究员",
+        "position": {
+          "x": 70,
+          "y": 170
+        },
+        "agent_id": "agent-researcher"
+      },
+      {
+        "id": "node-verifier",
+        "kind": "agent",
+        "label": "核验员",
+        "position": {
+          "x": 70,
+          "y": 340
+        },
+        "agent_id": "agent-verifier"
+      },
+      {
+        "id": "node-evidence-gate",
+        "kind": "condition",
+        "label": "证据是否充分",
+        "position": {
+          "x": 380,
+          "y": 340
+        },
+        "enforcement": "required"
+      },
+      {
+        "id": "node-writer",
+        "kind": "agent",
+        "label": "撰稿员",
+        "position": {
+          "x": 380,
+          "y": 170
+        },
+        "agent_id": "agent-writer"
+      },
+      {
+        "id": "node-output",
+        "kind": "output",
+        "label": "研究简报",
+        "position": {
+          "x": 380,
+          "y": 0
+        }
+      },
+      {
+        "id": "node-human",
+        "kind": "human_approval",
+        "label": "人工确认缺口",
+        "position": {
+          "x": 690,
+          "y": 340
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-input-research",
+        "source": "node-input",
+        "target": "node-researcher",
+        "kind": "handoff",
+        "mapping": {
+          "task": "task"
+        },
+        "condition": "required_input_valid"
+      },
+      {
+        "id": "edge-research-verify",
+        "source": "node-researcher",
+        "target": "node-verifier",
+        "kind": "delegate_and_return",
+        "mapping": {
+          "claims": "claims",
+          "sources": "sources"
+        },
+        "condition": "research_complete"
+      },
+      {
+        "id": "edge-verify-gate",
+        "source": "node-verifier",
+        "target": "node-evidence-gate",
+        "kind": "sequence",
+        "mapping": {
+          "verdict": "verdict",
+          "gaps": "gaps",
+          "verified_claims": "verified_claims",
+          "sources": "sources"
+        },
+        "condition": "verification_complete"
+      },
+      {
+        "id": "edge-gate-write",
+        "source": "node-evidence-gate",
+        "target": "node-writer",
+        "kind": "handoff",
+        "mapping": {
+          "verified_claims": "claims"
+        },
+        "condition": "evidence_sufficient"
+      },
+      {
+        "id": "edge-gate-return",
+        "source": "node-evidence-gate",
+        "target": "node-researcher",
+        "kind": "return",
+        "mapping": {
+          "gaps": "open_questions"
+        },
+        "condition": "evidence_insufficient_and_returns_lt_1"
+      },
+      {
+        "id": "edge-gate-human",
+        "source": "node-evidence-gate",
+        "target": "node-human",
+        "kind": "conditional",
+        "mapping": {
+          "gaps": "review_context"
+        },
+        "condition": "return_limit_reached"
+      },
+      {
+        "id": "edge-write-output",
+        "source": "node-writer",
+        "target": "node-output",
+        "kind": "sequence",
+        "mapping": {
+          "report": "report",
+          "citations": "citations"
+        },
+        "condition": "output_schema_valid"
+      }
+    ],
+    "configs": {
+      "agent-researcher": {
+        "input": {
+          "required_fields": [
+            "task"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "task": "string",
+            "sources": "array",
+            "open_questions": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "claim_evidence_mapping",
+          "on_failure": "supplement_once"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "supplement_once_then_escalate"
+        },
+        "instructions": {
+          "system": "整理主张、来源与证据缺口，不把推断当事实。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": [
+            "evidence",
+            "gaps"
+          ]
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-reasoner-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": "medium",
+          "temperature": null,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "temperature"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [
+            "tool-search-http",
+            "tool-read-mcp-http"
+          ],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "ReAct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 6,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "json",
+          "fields": [
+            "claims",
+            "sources",
+            "gaps"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "retrieve_more",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      },
+      "agent-verifier": {
+        "input": {
+          "required_fields": [
+            "claims",
+            "sources"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "claims": "array",
+            "sources": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "schema_check",
+          "on_failure": "flag_and_continue"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "flag_and_continue"
+        },
+        "instructions": {
+          "system": "逐条核验主张与引用，保留可复核的失败依据。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": [
+            "verification"
+          ]
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-reasoner-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": "medium",
+          "temperature": null,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "temperature"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [
+            "tool-evidence-function"
+          ],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "direct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 4,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "json",
+          "fields": [
+            "verdict",
+            "verified_claims",
+            "sources",
+            "gaps"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "return_to_researcher",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      },
+      "agent-writer": {
+        "input": {
+          "required_fields": [
+            "claims"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "claims": "array",
+            "citations": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "schema_check",
+          "on_failure": "flag_and_continue"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "flag_and_continue"
+        },
+        "instructions": {
+          "system": "基于核验材料成稿，明确不确定信息。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": []
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-writer-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": null,
+          "temperature": 0.4,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "reasoning_effort"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "direct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 4,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "markdown",
+          "fields": [
+            "report",
+            "citations",
+            "uncertainties"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "regenerate",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      }
+    },
+    "requirements": {
+      "purpose": "把研究问题转为有来源、有核验结论的研究简报。",
+      "audience": "个人研究与智能体调试",
+      "scope": "负责：公开资料检索、证据核验、简报生成\n不负责：发布报告、自动交易、代替用户决策",
+      "input": "task：研究问题（必填）\nsources：参考链接（可选）\nlanguage：中文 / 英文 / 日文",
+      "actions": "读取公开文档和提供的附件；只写入本地草稿，不执行外部发布。",
+      "output": "Markdown 研究简报 + 证据 JSON。包含结论、证据、不确定性和来源。",
+      "acceptance": "每条关键事实关联支持它的来源证据\n明确说明冲突来源\n无来源时明确无法判定\n在模拟 60 秒与 0.03 美元预算内结束或升级",
+      "failure": "证据不足补查一次；仍不足转人工。预算耗尽停止并交付已有结果。"
+    },
+    "budget": {
+      "maxSeconds": 60,
+      "maxCost": 0.03,
+      "maxReturns": 1,
+      "concurrency": 2
+    },
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  "savedDraft": {
+    "id": "draft-7c1bff32",
+    "name": "研究与核验工作组",
+    "sourceVersion": "team-v2-candidate",
+    "nodes": [
+      {
+        "id": "node-input",
+        "kind": "input",
+        "label": "研究任务",
+        "position": {
+          "x": 70,
+          "y": 0
+        }
+      },
+      {
+        "id": "node-researcher",
+        "kind": "agent",
+        "label": "研究员",
+        "position": {
+          "x": 70,
+          "y": 170
+        },
+        "agent_id": "agent-researcher"
+      },
+      {
+        "id": "node-verifier",
+        "kind": "agent",
+        "label": "核验员",
+        "position": {
+          "x": 70,
+          "y": 340
+        },
+        "agent_id": "agent-verifier"
+      },
+      {
+        "id": "node-evidence-gate",
+        "kind": "condition",
+        "label": "证据是否充分",
+        "position": {
+          "x": 380,
+          "y": 340
+        },
+        "enforcement": "required"
+      },
+      {
+        "id": "node-writer",
+        "kind": "agent",
+        "label": "撰稿员",
+        "position": {
+          "x": 380,
+          "y": 170
+        },
+        "agent_id": "agent-writer"
+      },
+      {
+        "id": "node-output",
+        "kind": "output",
+        "label": "研究简报",
+        "position": {
+          "x": 380,
+          "y": 0
+        }
+      },
+      {
+        "id": "node-human",
+        "kind": "human_approval",
+        "label": "人工确认缺口",
+        "position": {
+          "x": 690,
+          "y": 340
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-input-research",
+        "source": "node-input",
+        "target": "node-researcher",
+        "kind": "handoff",
+        "mapping": {
+          "task": "task"
+        },
+        "condition": "required_input_valid"
+      },
+      {
+        "id": "edge-research-verify",
+        "source": "node-researcher",
+        "target": "node-verifier",
+        "kind": "delegate_and_return",
+        "mapping": {
+          "claims": "claims",
+          "sources": "sources"
+        },
+        "condition": "research_complete"
+      },
+      {
+        "id": "edge-verify-gate",
+        "source": "node-verifier",
+        "target": "node-evidence-gate",
+        "kind": "sequence",
+        "mapping": {
+          "verdict": "verdict",
+          "gaps": "gaps",
+          "verified_claims": "verified_claims",
+          "sources": "sources"
+        },
+        "condition": "verification_complete"
+      },
+      {
+        "id": "edge-gate-write",
+        "source": "node-evidence-gate",
+        "target": "node-writer",
+        "kind": "handoff",
+        "mapping": {
+          "verified_claims": "claims"
+        },
+        "condition": "evidence_sufficient"
+      },
+      {
+        "id": "edge-gate-return",
+        "source": "node-evidence-gate",
+        "target": "node-researcher",
+        "kind": "return",
+        "mapping": {
+          "gaps": "open_questions"
+        },
+        "condition": "evidence_insufficient_and_returns_lt_1"
+      },
+      {
+        "id": "edge-gate-human",
+        "source": "node-evidence-gate",
+        "target": "node-human",
+        "kind": "conditional",
+        "mapping": {
+          "gaps": "review_context"
+        },
+        "condition": "return_limit_reached"
+      },
+      {
+        "id": "edge-write-output",
+        "source": "node-writer",
+        "target": "node-output",
+        "kind": "sequence",
+        "mapping": {
+          "report": "report",
+          "citations": "citations"
+        },
+        "condition": "output_schema_valid"
+      }
+    ],
+    "configs": {
+      "agent-researcher": {
+        "input": {
+          "required_fields": [
+            "task"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "task": "string",
+            "sources": "array",
+            "open_questions": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "claim_evidence_mapping",
+          "on_failure": "supplement_once"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "supplement_once_then_escalate"
+        },
+        "instructions": {
+          "system": "整理主张、来源与证据缺口，不把推断当事实。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": [
+            "evidence",
+            "gaps"
+          ]
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-reasoner-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": "medium",
+          "temperature": null,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "temperature"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [
+            "tool-search-http",
+            "tool-read-mcp-http"
+          ],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "ReAct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 6,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "json",
+          "fields": [
+            "claims",
+            "sources",
+            "gaps"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "retrieve_more",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      },
+      "agent-verifier": {
+        "input": {
+          "required_fields": [
+            "claims",
+            "sources"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "claims": "array",
+            "sources": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "schema_check",
+          "on_failure": "flag_and_continue"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "flag_and_continue"
+        },
+        "instructions": {
+          "system": "逐条核验主张与引用，保留可复核的失败依据。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": [
+            "verification"
+          ]
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-reasoner-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": "medium",
+          "temperature": null,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "temperature"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [
+            "tool-evidence-function"
+          ],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "direct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 4,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "json",
+          "fields": [
+            "verdict",
+            "verified_claims",
+            "sources",
+            "gaps"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "return_to_researcher",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      },
+      "agent-writer": {
+        "input": {
+          "required_fields": [
+            "claims"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "claims": "array",
+            "citations": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "schema_check",
+          "on_failure": "flag_and_continue"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "flag_and_continue"
+        },
+        "instructions": {
+          "system": "基于核验材料成稿，明确不确定信息。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": []
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-writer-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": null,
+          "temperature": 0.4,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "reasoning_effort"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "direct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 4,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "markdown",
+          "fields": [
+            "report",
+            "citations",
+            "uncertainties"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "regenerate",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      }
+    },
+    "requirements": {
+      "purpose": "把研究问题转为有来源、有核验结论的研究简报。",
+      "audience": "个人研究与智能体调试",
+      "scope": "负责：公开资料检索、证据核验、简报生成\n不负责：发布报告、自动交易、代替用户决策",
+      "input": "task：研究问题（必填）\nsources：参考链接（可选）\nlanguage：中文 / 英文 / 日文",
+      "actions": "读取公开文档和提供的附件；只写入本地草稿，不执行外部发布。",
+      "output": "Markdown 研究简报 + 证据 JSON。包含结论、证据、不确定性和来源。",
+      "acceptance": "每条关键事实关联支持它的来源证据\n明确说明冲突来源\n无来源时明确无法判定\n在模拟 60 秒与 0.03 美元预算内结束或升级",
+      "failure": "证据不足补查一次；仍不足转人工。预算耗尽停止并交付已有结果。"
+    },
+    "budget": {
+      "maxSeconds": 60,
+      "maxCost": 0.03,
+      "maxReturns": 1,
+      "concurrency": 2
+    },
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  "savedAt": null,
+  "versions": [
+    {
+      "id": "team-v1",
+      "name": "基线 v1",
+      "createdAt": "2026-09-20T00:00:00Z",
+      "draft": {
+        "id": "draft-1b574c15",
+        "name": "研究与核验工作组",
+        "sourceVersion": "team-v1",
+        "nodes": [
+          {
+            "id": "node-input",
+            "kind": "input",
+            "label": "研究任务",
+            "position": {
+              "x": 70,
+              "y": 0
+            }
+          },
+          {
+            "id": "node-researcher",
+            "kind": "agent",
+            "label": "研究员",
+            "position": {
+              "x": 70,
+              "y": 170
+            },
+            "agent_id": "agent-researcher"
+          },
+          {
+            "id": "node-verifier",
+            "kind": "agent",
+            "label": "核验员",
+            "position": {
+              "x": 70,
+              "y": 340
+            },
+            "agent_id": "agent-verifier"
+          },
+          {
+            "id": "node-evidence-gate",
+            "kind": "condition",
+            "label": "证据是否充分",
+            "position": {
+              "x": 380,
+              "y": 340
+            },
+            "enforcement": "advisory"
+          },
+          {
+            "id": "node-writer",
+            "kind": "agent",
+            "label": "撰稿员",
+            "position": {
+              "x": 380,
+              "y": 170
+            },
+            "agent_id": "agent-writer"
+          },
+          {
+            "id": "node-output",
+            "kind": "output",
+            "label": "研究简报",
+            "position": {
+              "x": 380,
+              "y": 0
+            }
+          },
+          {
+            "id": "node-human",
+            "kind": "human_approval",
+            "label": "人工确认缺口",
+            "position": {
+              "x": 690,
+              "y": 340
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "edge-input-research",
+            "source": "node-input",
+            "target": "node-researcher",
+            "kind": "handoff",
+            "mapping": {
+              "task": "task"
+            },
+            "condition": "required_input_valid"
+          },
+          {
+            "id": "edge-research-verify",
+            "source": "node-researcher",
+            "target": "node-verifier",
+            "kind": "delegate_and_return",
+            "mapping": {
+              "claims": "claims",
+              "sources": "sources"
+            },
+            "condition": "research_complete"
+          },
+          {
+            "id": "edge-verify-gate",
+            "source": "node-verifier",
+            "target": "node-evidence-gate",
+            "kind": "sequence",
+            "mapping": {
+              "verdict": "verdict",
+              "gaps": "gaps",
+              "verified_claims": "verified_claims",
+              "sources": "sources"
+            },
+            "condition": "verification_complete"
+          },
+          {
+            "id": "edge-gate-write",
+            "source": "node-evidence-gate",
+            "target": "node-writer",
+            "kind": "handoff",
+            "mapping": {
+              "verified_claims": "claims"
+            },
+            "condition": "evidence_sufficient_or_advisory_warning"
+          },
+          {
+            "id": "edge-gate-return",
+            "source": "node-evidence-gate",
+            "target": "node-researcher",
+            "kind": "return",
+            "mapping": {
+              "gaps": "open_questions"
+            },
+            "condition": "evidence_insufficient_and_returns_lt_1"
+          },
+          {
+            "id": "edge-gate-human",
+            "source": "node-evidence-gate",
+            "target": "node-human",
+            "kind": "conditional",
+            "mapping": {
+              "gaps": "review_context"
+            },
+            "condition": "return_limit_reached"
+          },
+          {
+            "id": "edge-write-output",
+            "source": "node-writer",
+            "target": "node-output",
+            "kind": "sequence",
+            "mapping": {
+              "report": "report",
+              "citations": "citations"
+            },
+            "condition": "output_schema_valid"
+          }
+        ],
+        "configs": {
+          "agent-researcher": {
+            "input": {
+              "required_fields": [
+                "task"
+              ],
+              "normalization": [
+                "trim_text",
+                "parse_attachments"
+              ],
+              "missing_fields": "ask_user",
+              "fields": {
+                "task": "string",
+                "sources": "array",
+                "open_questions": "array"
+              }
+            },
+            "guardrails": {
+              "input": "schema_check",
+              "tool_arguments": "read_only_scope",
+              "tool_results": "untrusted_evidence",
+              "output": "schema_check",
+              "on_failure": "flag_and_continue"
+            },
+            "grounding": {
+              "source_ids": [
+                "knowledge-public-docs"
+              ],
+              "retrieval": "mock_keyword_vector",
+              "rerank": "mock_reranker",
+              "freshness_days": 30,
+              "require_citations": true,
+              "on_insufficient_evidence": "flag_and_continue"
+            },
+            "instructions": {
+              "system": "整理主张、来源与证据缺口，不把推断当事实。",
+              "task_template": "处理 {{task}}，按角色输出。",
+              "skill_ids": [
+                "skill-source-check-v1"
+              ],
+              "effective_preview_available": true
+            },
+            "context": {
+              "history": "current_run",
+              "budget_tokens": 16000,
+              "compression": "summarize_completed_steps",
+              "private_memory": "read_only_mock",
+              "shared_memory": "team_evidence_board",
+              "shared_write_scope": [
+                "evidence",
+                "gaps"
+              ]
+            },
+            "model": {
+              "provider_id": "provider-mock",
+              "model_id": "mock-reasoner-v1",
+              "capabilities_source": "fixture_only_not_live_discovery",
+              "reasoning_effort": "medium",
+              "temperature": null,
+              "max_output_tokens": 2048,
+              "timeout_seconds": 30,
+              "fallback_model_id": null,
+              "unsupported_parameters": [
+                "temperature"
+              ],
+              "connection_status": "unconnected"
+            },
+            "tools": {
+              "allowed_ids": [
+                "tool-search-http",
+                "tool-read-mcp-http"
+              ],
+              "approval": "required_before_external_write",
+              "retry_count": 1,
+              "default_timeout_seconds": 10
+            },
+            "loop": {
+              "strategy": "ReAct",
+              "continue_when": "missing_verifiable_evidence",
+              "stop_when": "required_claims_supported_or_escalated",
+              "max_steps": 4,
+              "timeout_seconds": 60,
+              "cost_limit_usd": 0.03,
+              "no_progress_limit": 2,
+              "observable_only": true
+            },
+            "output": {
+              "format": "json",
+              "fields": [
+                "claims",
+                "sources",
+                "gaps"
+              ],
+              "schema_validation": true,
+              "content_validation": "code-evidence-v1",
+              "repair_action": "retrieve_more",
+              "repair_limit": 1,
+              "on_exhausted": "human_review"
+            }
+          },
+          "agent-verifier": {
+            "input": {
+              "required_fields": [
+                "claims",
+                "sources"
+              ],
+              "normalization": [
+                "trim_text",
+                "parse_attachments"
+              ],
+              "missing_fields": "ask_user",
+              "fields": {
+                "claims": "array",
+                "sources": "array"
+              }
+            },
+            "guardrails": {
+              "input": "schema_check",
+              "tool_arguments": "read_only_scope",
+              "tool_results": "untrusted_evidence",
+              "output": "schema_check",
+              "on_failure": "flag_and_continue"
+            },
+            "grounding": {
+              "source_ids": [
+                "knowledge-public-docs"
+              ],
+              "retrieval": "mock_keyword_vector",
+              "rerank": "mock_reranker",
+              "freshness_days": 30,
+              "require_citations": true,
+              "on_insufficient_evidence": "flag_and_continue"
+            },
+            "instructions": {
+              "system": "逐条核验主张与引用，保留可复核的失败依据。",
+              "task_template": "处理 {{task}}，按角色输出。",
+              "skill_ids": [
+                "skill-source-check-v1"
+              ],
+              "effective_preview_available": true
+            },
+            "context": {
+              "history": "current_run",
+              "budget_tokens": 16000,
+              "compression": "summarize_completed_steps",
+              "private_memory": "read_only_mock",
+              "shared_memory": "team_evidence_board",
+              "shared_write_scope": [
+                "verification"
+              ]
+            },
+            "model": {
+              "provider_id": "provider-mock",
+              "model_id": "mock-reasoner-v1",
+              "capabilities_source": "fixture_only_not_live_discovery",
+              "reasoning_effort": "medium",
+              "temperature": null,
+              "max_output_tokens": 2048,
+              "timeout_seconds": 30,
+              "fallback_model_id": null,
+              "unsupported_parameters": [
+                "temperature"
+              ],
+              "connection_status": "unconnected"
+            },
+            "tools": {
+              "allowed_ids": [
+                "tool-evidence-function"
+              ],
+              "approval": "required_before_external_write",
+              "retry_count": 1,
+              "default_timeout_seconds": 10
+            },
+            "loop": {
+              "strategy": "direct",
+              "continue_when": "missing_verifiable_evidence",
+              "stop_when": "required_claims_supported_or_escalated",
+              "max_steps": 4,
+              "timeout_seconds": 60,
+              "cost_limit_usd": 0.03,
+              "no_progress_limit": 2,
+              "observable_only": true
+            },
+            "output": {
+              "format": "json",
+              "fields": [
+                "verdict",
+                "verified_claims",
+                "sources",
+                "gaps"
+              ],
+              "schema_validation": true,
+              "content_validation": "code-evidence-v1",
+              "repair_action": "return_to_researcher",
+              "repair_limit": 1,
+              "on_exhausted": "human_review"
+            }
+          },
+          "agent-writer": {
+            "input": {
+              "required_fields": [
+                "claims"
+              ],
+              "normalization": [
+                "trim_text",
+                "parse_attachments"
+              ],
+              "missing_fields": "ask_user",
+              "fields": {
+                "claims": "array",
+                "citations": "array"
+              }
+            },
+            "guardrails": {
+              "input": "schema_check",
+              "tool_arguments": "read_only_scope",
+              "tool_results": "untrusted_evidence",
+              "output": "schema_check",
+              "on_failure": "flag_and_continue"
+            },
+            "grounding": {
+              "source_ids": [
+                "knowledge-public-docs"
+              ],
+              "retrieval": "mock_keyword_vector",
+              "rerank": "mock_reranker",
+              "freshness_days": 30,
+              "require_citations": true,
+              "on_insufficient_evidence": "flag_and_continue"
+            },
+            "instructions": {
+              "system": "基于核验材料成稿，明确不确定信息。",
+              "task_template": "处理 {{task}}，按角色输出。",
+              "skill_ids": [
+                "skill-source-check-v1"
+              ],
+              "effective_preview_available": true
+            },
+            "context": {
+              "history": "current_run",
+              "budget_tokens": 16000,
+              "compression": "summarize_completed_steps",
+              "private_memory": "read_only_mock",
+              "shared_memory": "team_evidence_board",
+              "shared_write_scope": []
+            },
+            "model": {
+              "provider_id": "provider-mock",
+              "model_id": "mock-writer-v1",
+              "capabilities_source": "fixture_only_not_live_discovery",
+              "reasoning_effort": null,
+              "temperature": 0.4,
+              "max_output_tokens": 2048,
+              "timeout_seconds": 30,
+              "fallback_model_id": null,
+              "unsupported_parameters": [
+                "reasoning_effort"
+              ],
+              "connection_status": "unconnected"
+            },
+            "tools": {
+              "allowed_ids": [],
+              "approval": "required_before_external_write",
+              "retry_count": 1,
+              "default_timeout_seconds": 10
+            },
+            "loop": {
+              "strategy": "direct",
+              "continue_when": "missing_verifiable_evidence",
+              "stop_when": "required_claims_supported_or_escalated",
+              "max_steps": 4,
+              "timeout_seconds": 60,
+              "cost_limit_usd": 0.03,
+              "no_progress_limit": 2,
+              "observable_only": true
+            },
+            "output": {
+              "format": "markdown",
+              "fields": [
+                "report",
+                "citations",
+                "uncertainties"
+              ],
+              "schema_validation": true,
+              "content_validation": "code-evidence-v1",
+              "repair_action": "regenerate",
+              "repair_limit": 1,
+              "on_exhausted": "human_review"
+            }
+          }
+        },
+        "requirements": {
+          "purpose": "把研究问题转为有来源、有核验结论的研究简报。",
+          "audience": "个人研究与智能体调试",
+          "scope": "负责：公开资料检索、证据核验、简报生成\n不负责：发布报告、自动交易、代替用户决策",
+          "input": "task：研究问题（必填）\nsources：参考链接（可选）\nlanguage：中文 / 英文 / 日文",
+          "actions": "读取公开文档和提供的附件；只写入本地草稿，不执行外部发布。",
+          "output": "Markdown 研究简报 + 证据 JSON。包含结论、证据、不确定性和来源。",
+          "acceptance": "每条关键事实关联支持它的来源证据\n明确说明冲突来源\n无来源时明确无法判定\n在模拟 60 秒与 0.03 美元预算内结束或升级",
+          "failure": "证据不足补查一次；仍不足转人工。预算耗尽停止并交付已有结果。"
+        },
+        "budget": {
+          "maxSeconds": 60,
+          "maxCost": 0.03,
+          "maxReturns": 1,
+          "concurrency": 2
+        },
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 1
+        }
+      }
+    },
+    {
+      "id": "team-v2-candidate",
+      "name": "候选 v2",
+      "createdAt": "2026-09-20T00:00:00Z",
+      "draft": {
+        "id": "draft-114eb7bd",
+        "name": "研究与核验工作组",
+        "sourceVersion": "team-v2-candidate",
+        "nodes": [
+          {
+            "id": "node-input",
+            "kind": "input",
+            "label": "研究任务",
+            "position": {
+              "x": 70,
+              "y": 0
+            }
+          },
+          {
+            "id": "node-researcher",
+            "kind": "agent",
+            "label": "研究员",
+            "position": {
+              "x": 70,
+              "y": 170
+            },
+            "agent_id": "agent-researcher"
+          },
+          {
+            "id": "node-verifier",
+            "kind": "agent",
+            "label": "核验员",
+            "position": {
+              "x": 70,
+              "y": 340
+            },
+            "agent_id": "agent-verifier"
+          },
+          {
+            "id": "node-evidence-gate",
+            "kind": "condition",
+            "label": "证据是否充分",
+            "position": {
+              "x": 380,
+              "y": 340
+            },
+            "enforcement": "required"
+          },
+          {
+            "id": "node-writer",
+            "kind": "agent",
+            "label": "撰稿员",
+            "position": {
+              "x": 380,
+              "y": 170
+            },
+            "agent_id": "agent-writer"
+          },
+          {
+            "id": "node-output",
+            "kind": "output",
+            "label": "研究简报",
+            "position": {
+              "x": 380,
+              "y": 0
+            }
+          },
+          {
+            "id": "node-human",
+            "kind": "human_approval",
+            "label": "人工确认缺口",
+            "position": {
+              "x": 690,
+              "y": 340
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "edge-input-research",
+            "source": "node-input",
+            "target": "node-researcher",
+            "kind": "handoff",
+            "mapping": {
+              "task": "task"
+            },
+            "condition": "required_input_valid"
+          },
+          {
+            "id": "edge-research-verify",
+            "source": "node-researcher",
+            "target": "node-verifier",
+            "kind": "delegate_and_return",
+            "mapping": {
+              "claims": "claims",
+              "sources": "sources"
+            },
+            "condition": "research_complete"
+          },
+          {
+            "id": "edge-verify-gate",
+            "source": "node-verifier",
+            "target": "node-evidence-gate",
+            "kind": "sequence",
+            "mapping": {
+              "verdict": "verdict",
+              "gaps": "gaps",
+              "verified_claims": "verified_claims",
+              "sources": "sources"
+            },
+            "condition": "verification_complete"
+          },
+          {
+            "id": "edge-gate-write",
+            "source": "node-evidence-gate",
+            "target": "node-writer",
+            "kind": "handoff",
+            "mapping": {
+              "verified_claims": "claims"
+            },
+            "condition": "evidence_sufficient"
+          },
+          {
+            "id": "edge-gate-return",
+            "source": "node-evidence-gate",
+            "target": "node-researcher",
+            "kind": "return",
+            "mapping": {
+              "gaps": "open_questions"
+            },
+            "condition": "evidence_insufficient_and_returns_lt_1"
+          },
+          {
+            "id": "edge-gate-human",
+            "source": "node-evidence-gate",
+            "target": "node-human",
+            "kind": "conditional",
+            "mapping": {
+              "gaps": "review_context"
+            },
+            "condition": "return_limit_reached"
+          },
+          {
+            "id": "edge-write-output",
+            "source": "node-writer",
+            "target": "node-output",
+            "kind": "sequence",
+            "mapping": {
+              "report": "report",
+              "citations": "citations"
+            },
+            "condition": "output_schema_valid"
+          }
+        ],
+        "configs": {
+          "agent-researcher": {
+            "input": {
+              "required_fields": [
+                "task"
+              ],
+              "normalization": [
+                "trim_text",
+                "parse_attachments"
+              ],
+              "missing_fields": "ask_user",
+              "fields": {
+                "task": "string",
+                "sources": "array",
+                "open_questions": "array"
+              }
+            },
+            "guardrails": {
+              "input": "schema_check",
+              "tool_arguments": "read_only_scope",
+              "tool_results": "untrusted_evidence",
+              "output": "claim_evidence_mapping",
+              "on_failure": "supplement_once"
+            },
+            "grounding": {
+              "source_ids": [
+                "knowledge-public-docs"
+              ],
+              "retrieval": "mock_keyword_vector",
+              "rerank": "mock_reranker",
+              "freshness_days": 30,
+              "require_citations": true,
+              "on_insufficient_evidence": "supplement_once_then_escalate"
+            },
+            "instructions": {
+              "system": "整理主张、来源与证据缺口，不把推断当事实。",
+              "task_template": "处理 {{task}}，按角色输出。",
+              "skill_ids": [
+                "skill-source-check-v1"
+              ],
+              "effective_preview_available": true
+            },
+            "context": {
+              "history": "current_run",
+              "budget_tokens": 16000,
+              "compression": "summarize_completed_steps",
+              "private_memory": "read_only_mock",
+              "shared_memory": "team_evidence_board",
+              "shared_write_scope": [
+                "evidence",
+                "gaps"
+              ]
+            },
+            "model": {
+              "provider_id": "provider-mock",
+              "model_id": "mock-reasoner-v1",
+              "capabilities_source": "fixture_only_not_live_discovery",
+              "reasoning_effort": "medium",
+              "temperature": null,
+              "max_output_tokens": 2048,
+              "timeout_seconds": 30,
+              "fallback_model_id": null,
+              "unsupported_parameters": [
+                "temperature"
+              ],
+              "connection_status": "unconnected"
+            },
+            "tools": {
+              "allowed_ids": [
+                "tool-search-http",
+                "tool-read-mcp-http"
+              ],
+              "approval": "required_before_external_write",
+              "retry_count": 1,
+              "default_timeout_seconds": 10
+            },
+            "loop": {
+              "strategy": "ReAct",
+              "continue_when": "missing_verifiable_evidence",
+              "stop_when": "required_claims_supported_or_escalated",
+              "max_steps": 6,
+              "timeout_seconds": 60,
+              "cost_limit_usd": 0.03,
+              "no_progress_limit": 2,
+              "observable_only": true
+            },
+            "output": {
+              "format": "json",
+              "fields": [
+                "claims",
+                "sources",
+                "gaps"
+              ],
+              "schema_validation": true,
+              "content_validation": "code-evidence-v1",
+              "repair_action": "retrieve_more",
+              "repair_limit": 1,
+              "on_exhausted": "human_review"
+            }
+          },
+          "agent-verifier": {
+            "input": {
+              "required_fields": [
+                "claims",
+                "sources"
+              ],
+              "normalization": [
+                "trim_text",
+                "parse_attachments"
+              ],
+              "missing_fields": "ask_user",
+              "fields": {
+                "claims": "array",
+                "sources": "array"
+              }
+            },
+            "guardrails": {
+              "input": "schema_check",
+              "tool_arguments": "read_only_scope",
+              "tool_results": "untrusted_evidence",
+              "output": "schema_check",
+              "on_failure": "flag_and_continue"
+            },
+            "grounding": {
+              "source_ids": [
+                "knowledge-public-docs"
+              ],
+              "retrieval": "mock_keyword_vector",
+              "rerank": "mock_reranker",
+              "freshness_days": 30,
+              "require_citations": true,
+              "on_insufficient_evidence": "flag_and_continue"
+            },
+            "instructions": {
+              "system": "逐条核验主张与引用，保留可复核的失败依据。",
+              "task_template": "处理 {{task}}，按角色输出。",
+              "skill_ids": [
+                "skill-source-check-v1"
+              ],
+              "effective_preview_available": true
+            },
+            "context": {
+              "history": "current_run",
+              "budget_tokens": 16000,
+              "compression": "summarize_completed_steps",
+              "private_memory": "read_only_mock",
+              "shared_memory": "team_evidence_board",
+              "shared_write_scope": [
+                "verification"
+              ]
+            },
+            "model": {
+              "provider_id": "provider-mock",
+              "model_id": "mock-reasoner-v1",
+              "capabilities_source": "fixture_only_not_live_discovery",
+              "reasoning_effort": "medium",
+              "temperature": null,
+              "max_output_tokens": 2048,
+              "timeout_seconds": 30,
+              "fallback_model_id": null,
+              "unsupported_parameters": [
+                "temperature"
+              ],
+              "connection_status": "unconnected"
+            },
+            "tools": {
+              "allowed_ids": [
+                "tool-evidence-function"
+              ],
+              "approval": "required_before_external_write",
+              "retry_count": 1,
+              "default_timeout_seconds": 10
+            },
+            "loop": {
+              "strategy": "direct",
+              "continue_when": "missing_verifiable_evidence",
+              "stop_when": "required_claims_supported_or_escalated",
+              "max_steps": 4,
+              "timeout_seconds": 60,
+              "cost_limit_usd": 0.03,
+              "no_progress_limit": 2,
+              "observable_only": true
+            },
+            "output": {
+              "format": "json",
+              "fields": [
+                "verdict",
+                "verified_claims",
+                "sources",
+                "gaps"
+              ],
+              "schema_validation": true,
+              "content_validation": "code-evidence-v1",
+              "repair_action": "return_to_researcher",
+              "repair_limit": 1,
+              "on_exhausted": "human_review"
+            }
+          },
+          "agent-writer": {
+            "input": {
+              "required_fields": [
+                "claims"
+              ],
+              "normalization": [
+                "trim_text",
+                "parse_attachments"
+              ],
+              "missing_fields": "ask_user",
+              "fields": {
+                "claims": "array",
+                "citations": "array"
+              }
+            },
+            "guardrails": {
+              "input": "schema_check",
+              "tool_arguments": "read_only_scope",
+              "tool_results": "untrusted_evidence",
+              "output": "schema_check",
+              "on_failure": "flag_and_continue"
+            },
+            "grounding": {
+              "source_ids": [
+                "knowledge-public-docs"
+              ],
+              "retrieval": "mock_keyword_vector",
+              "rerank": "mock_reranker",
+              "freshness_days": 30,
+              "require_citations": true,
+              "on_insufficient_evidence": "flag_and_continue"
+            },
+            "instructions": {
+              "system": "基于核验材料成稿，明确不确定信息。",
+              "task_template": "处理 {{task}}，按角色输出。",
+              "skill_ids": [
+                "skill-source-check-v1"
+              ],
+              "effective_preview_available": true
+            },
+            "context": {
+              "history": "current_run",
+              "budget_tokens": 16000,
+              "compression": "summarize_completed_steps",
+              "private_memory": "read_only_mock",
+              "shared_memory": "team_evidence_board",
+              "shared_write_scope": []
+            },
+            "model": {
+              "provider_id": "provider-mock",
+              "model_id": "mock-writer-v1",
+              "capabilities_source": "fixture_only_not_live_discovery",
+              "reasoning_effort": null,
+              "temperature": 0.4,
+              "max_output_tokens": 2048,
+              "timeout_seconds": 30,
+              "fallback_model_id": null,
+              "unsupported_parameters": [
+                "reasoning_effort"
+              ],
+              "connection_status": "unconnected"
+            },
+            "tools": {
+              "allowed_ids": [],
+              "approval": "required_before_external_write",
+              "retry_count": 1,
+              "default_timeout_seconds": 10
+            },
+            "loop": {
+              "strategy": "direct",
+              "continue_when": "missing_verifiable_evidence",
+              "stop_when": "required_claims_supported_or_escalated",
+              "max_steps": 4,
+              "timeout_seconds": 60,
+              "cost_limit_usd": 0.03,
+              "no_progress_limit": 2,
+              "observable_only": true
+            },
+            "output": {
+              "format": "markdown",
+              "fields": [
+                "report",
+                "citations",
+                "uncertainties"
+              ],
+              "schema_validation": true,
+              "content_validation": "code-evidence-v1",
+              "repair_action": "regenerate",
+              "repair_limit": 1,
+              "on_exhausted": "human_review"
+            }
+          }
+        },
+        "requirements": {
+          "purpose": "把研究问题转为有来源、有核验结论的研究简报。",
+          "audience": "个人研究与智能体调试",
+          "scope": "负责：公开资料检索、证据核验、简报生成\n不负责：发布报告、自动交易、代替用户决策",
+          "input": "task：研究问题（必填）\nsources：参考链接（可选）\nlanguage：中文 / 英文 / 日文",
+          "actions": "读取公开文档和提供的附件；只写入本地草稿，不执行外部发布。",
+          "output": "Markdown 研究简报 + 证据 JSON。包含结论、证据、不确定性和来源。",
+          "acceptance": "每条关键事实关联支持它的来源证据\n明确说明冲突来源\n无来源时明确无法判定\n在模拟 60 秒与 0.03 美元预算内结束或升级",
+          "failure": "证据不足补查一次；仍不足转人工。预算耗尽停止并交付已有结果。"
+        },
+        "budget": {
+          "maxSeconds": 60,
+          "maxCost": 0.03,
+          "maxReturns": 1,
+          "concurrency": 2
+        },
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 1
+        }
+      }
+    }
+  ],
+  "defaultVersion": "team-v1",
+  "runs": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "run-baseline",
+      "title": "引用证据回归 · 基线",
+      "team_id": "team-research",
+      "config_version": "team-v1",
+      "config_snapshot_ref": "team-v1",
+      "case_id": "case-missing-evidence",
+      "dataset_id": "dataset-v1",
+      "suite_id": "suite-v1",
+      "execution_mode": "mock_tools",
+      "execution_status": "completed",
+      "quality_status": "failed",
+      "started_at": "2026-09-20T00:00:00.000Z",
+      "ended_at": "2026-09-20T00:00:14.800Z",
+      "metrics": {
+        "duration": {
+          "value": 14.8,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 1840,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0064,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        }
+      },
+      "trace_id": "a11ce000000000000000000000000001",
+      "trace_completeness": "complete",
+      "input": {
+        "task": "比较两种示例追踪方案的证据回溯能力"
+      },
+      "output": {
+        "report": "方案 B 的相关能力缺少支持证据。",
+        "claim_evidence": [
+          {
+            "claim_id": "claim-01",
+            "claim": "方案 A 可关联检索证据",
+            "evidence_ids": [
+              "evidence-01"
+            ]
+          },
+          {
+            "claim_id": "claim-02",
+            "claim": "方案 B 可关联检索证据",
+            "evidence_ids": []
+          }
+        ],
+        "uncertainties": [
+          "方案 B 缺少证据"
+        ]
+      },
+      "decision_summary": "格式通过，关键事实缺少支撑。"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "run-candidate",
+      "title": "引用证据回归 · 候选",
+      "team_id": "team-research",
+      "config_version": "team-v2-candidate",
+      "config_snapshot_ref": "team-v2-candidate",
+      "case_id": "case-missing-evidence",
+      "dataset_id": "dataset-v1",
+      "suite_id": "suite-v1",
+      "execution_mode": "mock_tools",
+      "execution_status": "completed",
+      "quality_status": "passed",
+      "started_at": "2026-09-20T00:15:00.000Z",
+      "ended_at": "2026-09-20T00:15:18.200Z",
+      "metrics": {
+        "duration": {
+          "value": 18.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 2190,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0081,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        }
+      },
+      "trace_id": "a11ce000000000000000000000000002",
+      "trace_completeness": "complete",
+      "input": {
+        "task": "比较两种示例追踪方案的证据回溯能力"
+      },
+      "output": {
+        "report": "已补充支持方案 B 相关能力的来源。",
+        "claim_evidence": [
+          {
+            "claim_id": "claim-01",
+            "claim": "方案 A 可关联检索证据",
+            "evidence_ids": [
+              "evidence-01"
+            ]
+          },
+          {
+            "claim_id": "claim-02",
+            "claim": "方案 B 可关联检索证据",
+            "evidence_ids": [
+              "evidence-02"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "decision_summary": "核验退回一次，补查后同一规则通过。"
+    }
+  ],
+  "customCases": [],
+  "manualReviews": []
+}

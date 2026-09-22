@@ -1,0 +1,3369 @@
+{
+  "synthetic": true,
+  "model_called": false,
+  "schema_version": "1.0.0",
+  "artifact_type": "agent_studio_design_fixture",
+  "notice": "全部为虚构演示；未调用模型、工具或评估器，未连接服务。耗时、Token、成本及评分不是测量结果。",
+  "trace_contract": {
+    "format": "otel_shaped_domain_envelope",
+    "raw_otlp_wire_format": false,
+    "exporter_status": "unconnected",
+    "semconv_family": "OpenTelemetry GenAI",
+    "semconv_version": "unbound-design-reference",
+    "adapter_version": "mock-adapter-v1",
+    "compatibility_note": "不是 OTLP 导出包，未验证 Collector 兼容性。",
+    "references": [
+      "https://opentelemetry.io/docs/specs/semconv/gen-ai/"
+    ]
+  },
+  "ui_defaults": {
+    "page": "canvas",
+    "selected_team": "team-research",
+    "selected_version": "team-v2-candidate",
+    "selected_node": "node-researcher",
+    "selected_run": "run-baseline",
+    "selected_span": "0000000000000008",
+    "selected_dataset": "dataset-v1",
+    "selected_suite": "suite-v1",
+    "locale": "zh-CN",
+    "currency": "USD",
+    "connection_banner": "演示数据 · 所有执行连接未接入",
+    "node_types": [
+      "input",
+      "preprocess",
+      "condition",
+      "retrieval",
+      "agent",
+      "tool",
+      "parallel",
+      "join",
+      "human_approval",
+      "validation",
+      "output"
+    ]
+  },
+  "teams": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "team-research",
+      "name": "研究与核验工作组",
+      "purpose": "把研究问题转为可追溯简报",
+      "default_version": "team-v1",
+      "candidate_version": "team-v2-candidate",
+      "requirements": {
+        "purpose": "把研究问题转为有来源、有核验结论的研究简报。",
+        "audience": "个人研究与智能体调试",
+        "in_scope": [
+          "公开资料检索",
+          "证据核验",
+          "简报生成"
+        ],
+        "out_of_scope": [
+          "发布报告",
+          "自动交易",
+          "代替用户决策"
+        ],
+        "input_contract": {
+          "source": "manual_or_dataset",
+          "fields": [
+            {
+              "name": "task",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "sources",
+              "type": "array<url>",
+              "required": false
+            },
+            {
+              "name": "language",
+              "type": "enum:zh,en,ja",
+              "required": false,
+              "default": "zh"
+            }
+          ],
+          "example": {
+            "task": "比较两种示例追踪方案的证据回溯能力",
+            "sources": []
+          },
+          "missing_required": "ask_one_clarifying_question"
+        },
+        "action_contract": {
+          "read_resources": [
+            "public_docs",
+            "provided_attachments"
+          ],
+          "write_resources": [
+            "local_draft_only"
+          ],
+          "tool_ids": [
+            "tool-search-http",
+            "tool-read-mcp-http",
+            "tool-evidence-function"
+          ],
+          "external_side_effects_allowed": false
+        },
+        "output_contract": {
+          "format": "markdown_and_evidence_json",
+          "recipient": "current_user",
+          "sections": [
+            "结论",
+            "证据",
+            "不确定性",
+            "来源"
+          ],
+          "citations_required": true
+        },
+        "acceptance": [
+          {
+            "id": "req-evidence",
+            "condition": "每条关键事实关联支持它的来源证据",
+            "evaluator_version": "code-evidence-v1",
+            "case_ids": [
+              "case-missing-evidence",
+              "case-valid-evidence"
+            ]
+          },
+          {
+            "id": "req-conflict",
+            "condition": "明确说明冲突来源",
+            "evaluator_version": "llm-grounding-v1",
+            "case_ids": [
+              "case-conflicting-sources"
+            ]
+          },
+          {
+            "id": "req-unknown",
+            "condition": "无来源时明确无法判定",
+            "evaluator_version": "human-review-v1",
+            "case_ids": [
+              "case-source-unavailable"
+            ]
+          },
+          {
+            "id": "req-budget",
+            "condition": "在模拟 60 秒与 0.03 美元预算内结束或升级",
+            "evaluator_version": "code-budget-v1",
+            "case_ids": [
+              "case-missing-input",
+              "case-return-loop"
+            ]
+          }
+        ],
+        "failure_policy": {
+          "insufficient_evidence": "supplement_once_then_human_review",
+          "tool_unavailable": "report_blocked",
+          "budget_exhausted": "stop_with_partial_result"
+        }
+      }
+    }
+  ],
+  "agents": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "agent-researcher",
+      "name": "研究员",
+      "purpose": "寻找来源、整理事实与证据缺口",
+      "default_version": "researcher-v1"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "agent-verifier",
+      "name": "核验员",
+      "purpose": "核验主张与引用的对应关系",
+      "default_version": "verifier-v1"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "agent-writer",
+      "name": "撰稿员",
+      "purpose": "根据核验结果生成带来源的报告",
+      "default_version": "writer-v1"
+    }
+  ],
+  "agent_versions": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "researcher-v1",
+      "agent_id": "agent-researcher",
+      "immutable": true,
+      "parent_version": null,
+      "config": {
+        "input": {
+          "required_fields": [
+            "task"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "task": "string",
+            "sources": "array",
+            "open_questions": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "schema_check",
+          "on_failure": "flag_and_continue"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "flag_and_continue"
+        },
+        "instructions": {
+          "system": "整理主张、来源与证据缺口，不把推断当事实。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": [
+            "evidence",
+            "gaps"
+          ]
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-reasoner-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": "medium",
+          "temperature": null,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "temperature"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [
+            "tool-search-http",
+            "tool-read-mcp-http"
+          ],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "ReAct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 4,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "json",
+          "fields": [
+            "claims",
+            "sources",
+            "gaps"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "retrieve_more",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "verifier-v1",
+      "agent_id": "agent-verifier",
+      "immutable": true,
+      "parent_version": null,
+      "config": {
+        "input": {
+          "required_fields": [
+            "claims",
+            "sources"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "claims": "array",
+            "sources": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "schema_check",
+          "on_failure": "flag_and_continue"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "flag_and_continue"
+        },
+        "instructions": {
+          "system": "逐条核验主张与引用，保留可复核的失败依据。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": [
+            "verification"
+          ]
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-reasoner-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": "medium",
+          "temperature": null,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "temperature"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [
+            "tool-evidence-function"
+          ],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "direct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 4,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "json",
+          "fields": [
+            "verdict",
+            "verified_claims",
+            "sources",
+            "gaps"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "return_to_researcher",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "writer-v1",
+      "agent_id": "agent-writer",
+      "immutable": true,
+      "parent_version": null,
+      "config": {
+        "input": {
+          "required_fields": [
+            "claims"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "claims": "array",
+            "citations": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "schema_check",
+          "on_failure": "flag_and_continue"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "flag_and_continue"
+        },
+        "instructions": {
+          "system": "基于核验材料成稿，明确不确定信息。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": []
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-writer-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": null,
+          "temperature": 0.4,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "reasoning_effort"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "direct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 4,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "markdown",
+          "fields": [
+            "report",
+            "citations",
+            "uncertainties"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "regenerate",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "researcher-v2",
+      "agent_id": "agent-researcher",
+      "immutable": true,
+      "parent_version": "researcher-v1",
+      "config": {
+        "input": {
+          "required_fields": [
+            "task"
+          ],
+          "normalization": [
+            "trim_text",
+            "parse_attachments"
+          ],
+          "missing_fields": "ask_user",
+          "fields": {
+            "task": "string",
+            "sources": "array",
+            "open_questions": "array"
+          }
+        },
+        "guardrails": {
+          "input": "schema_check",
+          "tool_arguments": "read_only_scope",
+          "tool_results": "untrusted_evidence",
+          "output": "claim_evidence_mapping",
+          "on_failure": "supplement_once"
+        },
+        "grounding": {
+          "source_ids": [
+            "knowledge-public-docs"
+          ],
+          "retrieval": "mock_keyword_vector",
+          "rerank": "mock_reranker",
+          "freshness_days": 30,
+          "require_citations": true,
+          "on_insufficient_evidence": "supplement_once_then_escalate"
+        },
+        "instructions": {
+          "system": "整理主张、来源与证据缺口，不把推断当事实。",
+          "task_template": "处理 {{task}}，按角色输出。",
+          "skill_ids": [
+            "skill-source-check-v1"
+          ],
+          "effective_preview_available": true
+        },
+        "context": {
+          "history": "current_run",
+          "budget_tokens": 16000,
+          "compression": "summarize_completed_steps",
+          "private_memory": "read_only_mock",
+          "shared_memory": "team_evidence_board",
+          "shared_write_scope": [
+            "evidence",
+            "gaps"
+          ]
+        },
+        "model": {
+          "provider_id": "provider-mock",
+          "model_id": "mock-reasoner-v1",
+          "capabilities_source": "fixture_only_not_live_discovery",
+          "reasoning_effort": "medium",
+          "temperature": null,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 30,
+          "fallback_model_id": null,
+          "unsupported_parameters": [
+            "temperature"
+          ],
+          "connection_status": "unconnected"
+        },
+        "tools": {
+          "allowed_ids": [
+            "tool-search-http",
+            "tool-read-mcp-http"
+          ],
+          "approval": "required_before_external_write",
+          "retry_count": 1,
+          "default_timeout_seconds": 10
+        },
+        "loop": {
+          "strategy": "ReAct",
+          "continue_when": "missing_verifiable_evidence",
+          "stop_when": "required_claims_supported_or_escalated",
+          "max_steps": 6,
+          "timeout_seconds": 60,
+          "cost_limit_usd": 0.03,
+          "no_progress_limit": 2,
+          "observable_only": true
+        },
+        "output": {
+          "format": "json",
+          "fields": [
+            "claims",
+            "sources",
+            "gaps"
+          ],
+          "schema_validation": true,
+          "content_validation": "code-evidence-v1",
+          "repair_action": "retrieve_more",
+          "repair_limit": 1,
+          "on_exhausted": "human_review"
+        }
+      }
+    }
+  ],
+  "team_versions": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "team-v1",
+      "team_id": "team-research",
+      "immutable": true,
+      "parent_version": null,
+      "member_versions": {
+        "agent-researcher": "researcher-v1",
+        "agent-verifier": "verifier-v1",
+        "agent-writer": "writer-v1"
+      },
+      "shared_context": [
+        "task",
+        "evidence_board",
+        "verification_summary"
+      ],
+      "budget": {
+        "max_seconds": 60,
+        "max_cost_usd": 0.03,
+        "max_concurrency": 2,
+        "max_team_returns": 1,
+        "global_stop": "budget_or_loop_limit_or_human_escalation"
+      },
+      "parallel_defaults": {
+        "wait_for": "all",
+        "timeout_seconds": 20,
+        "partial_failure": "human_review"
+      },
+      "nodes": [
+        {
+          "id": "node-input",
+          "kind": "input",
+          "label": "研究任务",
+          "position": {
+            "x": 60,
+            "y": 180
+          }
+        },
+        {
+          "id": "node-researcher",
+          "kind": "agent",
+          "label": "研究员",
+          "position": {
+            "x": 330,
+            "y": 180
+          },
+          "agent_id": "agent-researcher"
+        },
+        {
+          "id": "node-verifier",
+          "kind": "agent",
+          "label": "核验员",
+          "position": {
+            "x": 620,
+            "y": 180
+          },
+          "agent_id": "agent-verifier"
+        },
+        {
+          "id": "node-evidence-gate",
+          "kind": "condition",
+          "label": "证据是否充分",
+          "position": {
+            "x": 900,
+            "y": 180
+          },
+          "enforcement": "advisory"
+        },
+        {
+          "id": "node-writer",
+          "kind": "agent",
+          "label": "撰稿员",
+          "position": {
+            "x": 1170,
+            "y": 180
+          },
+          "agent_id": "agent-writer"
+        },
+        {
+          "id": "node-output",
+          "kind": "output",
+          "label": "研究简报",
+          "position": {
+            "x": 1450,
+            "y": 180
+          }
+        },
+        {
+          "id": "node-human",
+          "kind": "human_approval",
+          "label": "人工确认缺口",
+          "position": {
+            "x": 900,
+            "y": 430
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge-input-research",
+          "source": "node-input",
+          "target": "node-researcher",
+          "kind": "handoff",
+          "mapping": {
+            "task": "task"
+          },
+          "condition": "required_input_valid"
+        },
+        {
+          "id": "edge-research-verify",
+          "source": "node-researcher",
+          "target": "node-verifier",
+          "kind": "delegate_and_return",
+          "mapping": {
+            "claims": "claims",
+            "sources": "sources"
+          },
+          "condition": "research_complete"
+        },
+        {
+          "id": "edge-verify-gate",
+          "source": "node-verifier",
+          "target": "node-evidence-gate",
+          "kind": "sequence",
+          "mapping": {
+            "verdict": "verdict",
+            "gaps": "gaps",
+            "verified_claims": "verified_claims",
+            "sources": "sources"
+          },
+          "condition": "verification_complete"
+        },
+        {
+          "id": "edge-gate-write",
+          "source": "node-evidence-gate",
+          "target": "node-writer",
+          "kind": "handoff",
+          "mapping": {
+            "verified_claims": "claims"
+          },
+          "condition": "evidence_sufficient_or_advisory_warning"
+        },
+        {
+          "id": "edge-gate-return",
+          "source": "node-evidence-gate",
+          "target": "node-researcher",
+          "kind": "return",
+          "mapping": {
+            "gaps": "open_questions"
+          },
+          "condition": "evidence_insufficient_and_returns_lt_1"
+        },
+        {
+          "id": "edge-gate-human",
+          "source": "node-evidence-gate",
+          "target": "node-human",
+          "kind": "conditional",
+          "mapping": {
+            "gaps": "review_context"
+          },
+          "condition": "return_limit_reached"
+        },
+        {
+          "id": "edge-write-output",
+          "source": "node-writer",
+          "target": "node-output",
+          "kind": "sequence",
+          "mapping": {
+            "report": "report",
+            "citations": "citations"
+          },
+          "condition": "output_schema_valid"
+        }
+      ],
+      "changes": []
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "team-v2-candidate",
+      "team_id": "team-research",
+      "immutable": true,
+      "parent_version": "team-v1",
+      "member_versions": {
+        "agent-researcher": "researcher-v2",
+        "agent-verifier": "verifier-v1",
+        "agent-writer": "writer-v1"
+      },
+      "shared_context": [
+        "task",
+        "evidence_board",
+        "verification_summary"
+      ],
+      "budget": {
+        "max_seconds": 60,
+        "max_cost_usd": 0.03,
+        "max_concurrency": 2,
+        "max_team_returns": 1,
+        "global_stop": "budget_or_loop_limit_or_human_escalation"
+      },
+      "parallel_defaults": {
+        "wait_for": "all",
+        "timeout_seconds": 20,
+        "partial_failure": "human_review"
+      },
+      "nodes": [
+        {
+          "id": "node-input",
+          "kind": "input",
+          "label": "研究任务",
+          "position": {
+            "x": 60,
+            "y": 180
+          }
+        },
+        {
+          "id": "node-researcher",
+          "kind": "agent",
+          "label": "研究员",
+          "position": {
+            "x": 330,
+            "y": 180
+          },
+          "agent_id": "agent-researcher"
+        },
+        {
+          "id": "node-verifier",
+          "kind": "agent",
+          "label": "核验员",
+          "position": {
+            "x": 620,
+            "y": 180
+          },
+          "agent_id": "agent-verifier"
+        },
+        {
+          "id": "node-evidence-gate",
+          "kind": "condition",
+          "label": "证据是否充分",
+          "position": {
+            "x": 900,
+            "y": 180
+          },
+          "enforcement": "required"
+        },
+        {
+          "id": "node-writer",
+          "kind": "agent",
+          "label": "撰稿员",
+          "position": {
+            "x": 1170,
+            "y": 180
+          },
+          "agent_id": "agent-writer"
+        },
+        {
+          "id": "node-output",
+          "kind": "output",
+          "label": "研究简报",
+          "position": {
+            "x": 1450,
+            "y": 180
+          }
+        },
+        {
+          "id": "node-human",
+          "kind": "human_approval",
+          "label": "人工确认缺口",
+          "position": {
+            "x": 900,
+            "y": 430
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge-input-research",
+          "source": "node-input",
+          "target": "node-researcher",
+          "kind": "handoff",
+          "mapping": {
+            "task": "task"
+          },
+          "condition": "required_input_valid"
+        },
+        {
+          "id": "edge-research-verify",
+          "source": "node-researcher",
+          "target": "node-verifier",
+          "kind": "delegate_and_return",
+          "mapping": {
+            "claims": "claims",
+            "sources": "sources"
+          },
+          "condition": "research_complete"
+        },
+        {
+          "id": "edge-verify-gate",
+          "source": "node-verifier",
+          "target": "node-evidence-gate",
+          "kind": "sequence",
+          "mapping": {
+            "verdict": "verdict",
+            "gaps": "gaps",
+            "verified_claims": "verified_claims",
+            "sources": "sources"
+          },
+          "condition": "verification_complete"
+        },
+        {
+          "id": "edge-gate-write",
+          "source": "node-evidence-gate",
+          "target": "node-writer",
+          "kind": "handoff",
+          "mapping": {
+            "verified_claims": "claims"
+          },
+          "condition": "evidence_sufficient"
+        },
+        {
+          "id": "edge-gate-return",
+          "source": "node-evidence-gate",
+          "target": "node-researcher",
+          "kind": "return",
+          "mapping": {
+            "gaps": "open_questions"
+          },
+          "condition": "evidence_insufficient_and_returns_lt_1"
+        },
+        {
+          "id": "edge-gate-human",
+          "source": "node-evidence-gate",
+          "target": "node-human",
+          "kind": "conditional",
+          "mapping": {
+            "gaps": "review_context"
+          },
+          "condition": "return_limit_reached"
+        },
+        {
+          "id": "edge-write-output",
+          "source": "node-writer",
+          "target": "node-output",
+          "kind": "sequence",
+          "mapping": {
+            "report": "report",
+            "citations": "citations"
+          },
+          "condition": "output_schema_valid"
+        }
+      ],
+      "changes": [
+        "检索结果逐条映射到关键事实",
+        "证据缺失时补查一次",
+        "保留冲突来源的人工处理路径"
+      ]
+    }
+  ],
+  "drafts": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "draft-evidence-fix",
+      "team_id": "team-research",
+      "based_on": "team-v1",
+      "candidate_version": "team-v2-candidate",
+      "status": "saved_draft",
+      "reason_run_id": "run-baseline",
+      "changes": [
+        "建立事实与来源映射",
+        "证据缺失时补查一次"
+      ],
+      "default_promotion_status": "not_promoted"
+    }
+  ],
+  "resources": {
+    "connectors": [
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "provider-mock",
+        "kind": "model_provider",
+        "label": "演示模型提供方",
+        "connection_status": "unconnected",
+        "credential_ref": null
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "otel-collector",
+        "kind": "trace_exporter",
+        "label": "OpenTelemetry Collector",
+        "connection_status": "unconnected",
+        "credential_ref": null
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "promptfoo-adapter",
+        "kind": "test_runner",
+        "label": "Promptfoo",
+        "connection_status": "unconnected",
+        "credential_ref": null
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "custom-test-runner",
+        "kind": "test_runner",
+        "label": "自定义执行器",
+        "connection_status": "unconnected",
+        "credential_ref": null
+      }
+    ],
+    "tools": [
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "tool-evidence-function",
+        "label": "证据结构检查",
+        "protocol": "function",
+        "transport": null,
+        "connection_status": "unconnected",
+        "execution_mode": "fixture_only",
+        "credential_ref": null,
+        "endpoint": null,
+        "side_effect": "none",
+        "approval_required": false,
+        "timeout_seconds": 10,
+        "retries": 1,
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          }
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "result"
+          ],
+          "properties": {
+            "result": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "tool-search-http",
+        "label": "公开资料检索",
+        "protocol": "http_api",
+        "transport": "https",
+        "connection_status": "unconnected",
+        "execution_mode": "fixture_only",
+        "credential_ref": null,
+        "endpoint": null,
+        "side_effect": "read",
+        "approval_required": false,
+        "timeout_seconds": 10,
+        "retries": 1,
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          }
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "result"
+          ],
+          "properties": {
+            "result": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "tool-format-cli",
+        "label": "本地报告格式化",
+        "protocol": "cli",
+        "transport": "process",
+        "connection_status": "unconnected",
+        "execution_mode": "fixture_only",
+        "credential_ref": null,
+        "endpoint": null,
+        "side_effect": "write_local",
+        "approval_required": true,
+        "timeout_seconds": 10,
+        "retries": 1,
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          }
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "result"
+          ],
+          "properties": {
+            "result": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "tool-read-mcp-stdio",
+        "label": "文件资料读取",
+        "protocol": "mcp",
+        "transport": "stdio",
+        "connection_status": "unconnected",
+        "execution_mode": "fixture_only",
+        "credential_ref": null,
+        "endpoint": null,
+        "side_effect": "read",
+        "approval_required": false,
+        "timeout_seconds": 10,
+        "retries": 1,
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          }
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "result"
+          ],
+          "properties": {
+            "result": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "tool-read-mcp-http",
+        "label": "文档资料读取",
+        "protocol": "mcp",
+        "transport": "streamable_http",
+        "connection_status": "unconnected",
+        "execution_mode": "fixture_only",
+        "credential_ref": null,
+        "endpoint": null,
+        "side_effect": "read",
+        "approval_required": false,
+        "timeout_seconds": 10,
+        "retries": 1,
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          }
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "result"
+          ],
+          "properties": {
+            "result": {
+              "type": "array"
+            }
+          }
+        }
+      }
+    ],
+    "knowledge": [
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "knowledge-public-docs",
+        "name": "公共文档示例集",
+        "connection_status": "unconnected",
+        "freshness_status": "mock_only",
+        "document_count": 2
+      }
+    ],
+    "skills": [
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "skill-source-check-v1",
+        "label": "证据核验",
+        "version": "1",
+        "content": "逐条核对事实与引用，不凭引用数量判断。"
+      }
+    ],
+    "models": [
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "mock-reasoner-v1",
+        "provider_id": "provider-mock",
+        "label": "推理模型（模拟）",
+        "capabilities": {
+          "reasoning_efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "temperature": false
+        },
+        "connection_status": "unconnected"
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "mock-writer-v1",
+        "provider_id": "provider-mock",
+        "label": "写作模型（模拟）",
+        "capabilities": {
+          "reasoning_efforts": [],
+          "temperature": true
+        },
+        "connection_status": "unconnected"
+      },
+      {
+        "synthetic": true,
+        "model_called": false,
+        "id": "mock-judge-v1",
+        "provider_id": "provider-mock",
+        "label": "评估模型（模拟）",
+        "capabilities": {
+          "reasoning_efforts": [
+            "low",
+            "medium"
+          ],
+          "temperature": false
+        },
+        "connection_status": "unconnected"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "evidence-01",
+      "source_title": "示例来源 A",
+      "uri": "mock://evidence/source-a",
+      "excerpt": "方案 A 为每次检索保留来源标识。",
+      "supports": [
+        "claim-01"
+      ]
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "evidence-02",
+      "source_title": "示例补充来源 B",
+      "uri": "mock://evidence/source-b",
+      "excerpt": "方案 B 为结果保留关联的来源标识。",
+      "supports": [
+        "claim-02"
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "run-baseline",
+      "title": "引用证据回归 · 基线",
+      "team_id": "team-research",
+      "config_version": "team-v1",
+      "config_snapshot_ref": "team-v1",
+      "case_id": "case-missing-evidence",
+      "dataset_id": "dataset-v1",
+      "suite_id": "suite-v1",
+      "execution_mode": "mock_tools",
+      "execution_status": "completed",
+      "quality_status": "failed",
+      "started_at": "2026-09-20T00:00:00.000Z",
+      "ended_at": "2026-09-20T00:00:14.800Z",
+      "metrics": {
+        "duration": {
+          "value": 14.8,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 1840,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0064,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        }
+      },
+      "trace_id": "a11ce000000000000000000000000001",
+      "trace_completeness": "complete",
+      "input": {
+        "task": "比较两种示例追踪方案的证据回溯能力"
+      },
+      "output": {
+        "report": "方案 B 的相关能力缺少支持证据。",
+        "claim_evidence": [
+          {
+            "claim_id": "claim-01",
+            "claim": "方案 A 可关联检索证据",
+            "evidence_ids": [
+              "evidence-01"
+            ]
+          },
+          {
+            "claim_id": "claim-02",
+            "claim": "方案 B 可关联检索证据",
+            "evidence_ids": []
+          }
+        ],
+        "uncertainties": [
+          "方案 B 缺少证据"
+        ]
+      },
+      "decision_summary": "格式通过，关键事实缺少支撑。"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "run-candidate",
+      "title": "引用证据回归 · 候选",
+      "team_id": "team-research",
+      "config_version": "team-v2-candidate",
+      "config_snapshot_ref": "team-v2-candidate",
+      "case_id": "case-missing-evidence",
+      "dataset_id": "dataset-v1",
+      "suite_id": "suite-v1",
+      "execution_mode": "mock_tools",
+      "execution_status": "completed",
+      "quality_status": "passed",
+      "started_at": "2026-09-20T00:15:00.000Z",
+      "ended_at": "2026-09-20T00:15:18.200Z",
+      "metrics": {
+        "duration": {
+          "value": 18.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 2190,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0081,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        }
+      },
+      "trace_id": "a11ce000000000000000000000000002",
+      "trace_completeness": "complete",
+      "input": {
+        "task": "比较两种示例追踪方案的证据回溯能力"
+      },
+      "output": {
+        "report": "已补充支持方案 B 相关能力的来源。",
+        "claim_evidence": [
+          {
+            "claim_id": "claim-01",
+            "claim": "方案 A 可关联检索证据",
+            "evidence_ids": [
+              "evidence-01"
+            ]
+          },
+          {
+            "claim_id": "claim-02",
+            "claim": "方案 B 可关联检索证据",
+            "evidence_ids": [
+              "evidence-02"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "decision_summary": "核验退回一次，补查后同一规则通过。"
+    }
+  ],
+  "run_state_examples": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "state-success",
+      "execution_status": "completed",
+      "quality_status": "passed",
+      "trace_completeness": "complete",
+      "label": "执行完成 / 质量通过",
+      "suggested_action": "view_trace"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "state-failure",
+      "execution_status": "failed",
+      "quality_status": "not_evaluated",
+      "trace_completeness": "complete",
+      "label": "工具超时 / 未评估",
+      "suggested_action": "inspect_tool_span"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "state-waiting",
+      "execution_status": "waiting_approval",
+      "quality_status": "not_evaluated",
+      "trace_completeness": "partial",
+      "label": "等待人工确认",
+      "suggested_action": "review_request"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "state-cancelled",
+      "execution_status": "cancelled",
+      "quality_status": "not_evaluated",
+      "trace_completeness": "partial",
+      "label": "用户取消",
+      "suggested_action": "view_partial_output"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "state-budget",
+      "execution_status": "budget_exhausted",
+      "quality_status": "not_evaluated",
+      "trace_completeness": "complete",
+      "label": "预算已耗尽",
+      "suggested_action": "edit_budget_draft"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "state-looplimit",
+      "execution_status": "loop_limit",
+      "quality_status": "insufficient_evidence",
+      "trace_completeness": "complete",
+      "label": "循环达上限 / 证据不足",
+      "suggested_action": "human_review"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "state-incomplete",
+      "execution_status": "completed",
+      "quality_status": "unknown",
+      "trace_completeness": "incomplete",
+      "label": "执行完成 / Trace 不完整",
+      "suggested_action": "show_missing_instrumentation"
+    }
+  ],
+  "spans": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000001",
+      "parent_span_id": null,
+      "run_id": "run-baseline",
+      "name": "研究团队 · 基线",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:00:00.000Z",
+      "end_time": "2026-09-20T00:00:14.800Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "team-research",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "agent_studio.team.version": "team-v1"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": null,
+      "metrics": {
+        "duration": {
+          "value": 14.8,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "研究团队 · 基线（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000002",
+      "parent_span_id": "0000000000000001",
+      "run_id": "run-baseline",
+      "name": "研究员",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:00:00.000Z",
+      "end_time": "2026-09-20T00:00:07.200Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "researcher-v1",
+      "metrics": {
+        "duration": {
+          "value": 7.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "研究员（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000003",
+      "parent_span_id": "0000000000000002",
+      "run_id": "run-baseline",
+      "name": "检索公开资料",
+      "kind": "client",
+      "start_time": "2026-09-20T00:00:00.200Z",
+      "end_time": "2026-09-20T00:00:02.200Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "execute_tool",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.tool.name": "tool-search-http"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "researcher-v1",
+      "metrics": {
+        "duration": {
+          "value": 2.0,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "query": "示例追踪方案证据回溯"
+        },
+        "output": {
+          "result": [
+            "evidence-01"
+          ]
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000004",
+      "parent_span_id": "0000000000000002",
+      "run_id": "run-baseline",
+      "name": "整理主张与引用",
+      "kind": "client",
+      "start_time": "2026-09-20T00:00:02.200Z",
+      "end_time": "2026-09-20T00:00:06.800Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "chat",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.request.model": "mock-reasoner-v1",
+        "gen_ai.provider.name": "mock-provider"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "researcher-v1",
+      "metrics": {
+        "duration": {
+          "value": 4.6,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 590,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.002,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": null
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "整理主张与引用（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000005",
+      "parent_span_id": "0000000000000001",
+      "run_id": "run-baseline",
+      "name": "核验员",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:00:07.200Z",
+      "end_time": "2026-09-20T00:00:10.100Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 2.9,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "核验员（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000006",
+      "parent_span_id": "0000000000000005",
+      "run_id": "run-baseline",
+      "name": "检查输出结构",
+      "kind": "client",
+      "start_time": "2026-09-20T00:00:07.300Z",
+      "end_time": "2026-09-20T00:00:07.800Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "execute_tool",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.tool.name": "tool-evidence-function"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 0.5,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "query": "示例追踪方案证据回溯"
+        },
+        "output": {
+          "result": [
+            "evidence-01"
+          ]
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000007",
+      "parent_span_id": "0000000000000005",
+      "run_id": "run-baseline",
+      "name": "核验事实支撑",
+      "kind": "client",
+      "start_time": "2026-09-20T00:00:07.900Z",
+      "end_time": "2026-09-20T00:00:10.000Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "chat",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.request.model": "mock-reasoner-v1",
+        "gen_ai.provider.name": "mock-provider"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 2.1,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 430,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0015,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": null
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "核验事实支撑（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000008",
+      "parent_span_id": "0000000000000005",
+      "run_id": "run-baseline",
+      "name": "引用缺少证据",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:00:10.000Z",
+      "end_time": "2026-09-20T00:00:10.100Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "validate_output",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "agent_studio.quality.verdict": "failed"
+      },
+      "events": [
+        {
+          "name": "quality.evidence_missing",
+          "time": "2026-09-20T00:00:10.050Z",
+          "attributes": {
+            "claim_id": "claim-02",
+            "evidence_id": null,
+            "execution_error": false
+          }
+        }
+      ],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 0.1,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "claim_id": "claim-02",
+          "candidate_citation_ids": [
+            "evidence-01"
+          ]
+        },
+        "output": {
+          "verdict": "failed",
+          "supported_evidence_ids": [],
+          "reason": "引用只支撑 claim-01；claim-02 缺少支持来源。"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "0000000000000009",
+      "parent_span_id": "0000000000000001",
+      "run_id": "run-baseline",
+      "name": "撰稿员",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:00:10.100Z",
+      "end_time": "2026-09-20T00:00:14.800Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-writer",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "writer-v1",
+      "metrics": {
+        "duration": {
+          "value": 4.7,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "撰稿员（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "000000000000000a",
+      "parent_span_id": "0000000000000009",
+      "run_id": "run-baseline",
+      "name": "生成简报",
+      "kind": "client",
+      "start_time": "2026-09-20T00:00:10.300Z",
+      "end_time": "2026-09-20T00:00:14.500Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-writer",
+        "gen_ai.operation.name": "chat",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.request.model": "mock-writer-v1",
+        "gen_ai.provider.name": "mock-provider"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": "writer-v1",
+      "metrics": {
+        "duration": {
+          "value": 4.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 820,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0029,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": null
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "生成简报（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000001",
+      "span_id": "000000000000000b",
+      "parent_span_id": "0000000000000009",
+      "run_id": "run-baseline",
+      "name": "格式校验完成",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:00:14.500Z",
+      "end_time": "2026-09-20T00:00:14.800Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-output",
+        "gen_ai.operation.name": "validate_output",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v1",
+      "member_version": null,
+      "metrics": {
+        "duration": {
+          "value": 0.3,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "格式校验完成（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000065",
+      "parent_span_id": null,
+      "run_id": "run-candidate",
+      "name": "研究团队 · 候选",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:15:00.000Z",
+      "end_time": "2026-09-20T00:15:18.200Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "team-research",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "agent_studio.team.version": "team-v2-candidate"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": null,
+      "metrics": {
+        "duration": {
+          "value": 18.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "研究团队 · 候选（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000066",
+      "parent_span_id": "0000000000000065",
+      "run_id": "run-candidate",
+      "name": "研究员 · 首轮",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:15:00.000Z",
+      "end_time": "2026-09-20T00:15:05.000Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "researcher-v2",
+      "metrics": {
+        "duration": {
+          "value": 5.0,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "研究员 · 首轮（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000067",
+      "parent_span_id": "0000000000000066",
+      "run_id": "run-candidate",
+      "name": "检索公开资料",
+      "kind": "client",
+      "start_time": "2026-09-20T00:15:00.200Z",
+      "end_time": "2026-09-20T00:15:02.200Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "execute_tool",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.tool.name": "tool-search-http"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "researcher-v2",
+      "metrics": {
+        "duration": {
+          "value": 2.0,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "query": "示例追踪方案证据回溯"
+        },
+        "output": {
+          "result": [
+            "evidence-01"
+          ]
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000068",
+      "parent_span_id": "0000000000000066",
+      "run_id": "run-candidate",
+      "name": "整理事实与缺口",
+      "kind": "client",
+      "start_time": "2026-09-20T00:15:02.200Z",
+      "end_time": "2026-09-20T00:15:04.900Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "chat",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.request.model": "mock-reasoner-v1",
+        "gen_ai.provider.name": "mock-provider"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "researcher-v2",
+      "metrics": {
+        "duration": {
+          "value": 2.7,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 430,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0016,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": null
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "整理事实与缺口（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000069",
+      "parent_span_id": "0000000000000065",
+      "run_id": "run-candidate",
+      "name": "核验员 · 退回补查",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:15:05.000Z",
+      "end_time": "2026-09-20T00:15:06.500Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "agent_studio.quality.verdict": "insufficient_evidence"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 1.5,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "核验员 · 退回补查（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000072",
+      "parent_span_id": "0000000000000069",
+      "run_id": "run-candidate",
+      "name": "识别证据缺口",
+      "kind": "client",
+      "start_time": "2026-09-20T00:15:05.100Z",
+      "end_time": "2026-09-20T00:15:06.300Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "mock-reasoner-v1",
+        "gen_ai.provider.name": "mock-provider",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 1.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 260,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.001,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": null
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "识别证据缺口（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "000000000000006a",
+      "parent_span_id": "0000000000000065",
+      "run_id": "run-candidate",
+      "name": "研究员 · 补查",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:15:06.500Z",
+      "end_time": "2026-09-20T00:15:10.000Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "agent_studio.loop.iteration": 2
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "researcher-v2",
+      "metrics": {
+        "duration": {
+          "value": 3.5,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "研究员 · 补查（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "000000000000006b",
+      "parent_span_id": "000000000000006a",
+      "run_id": "run-candidate",
+      "name": "读取补充资料",
+      "kind": "client",
+      "start_time": "2026-09-20T00:15:06.600Z",
+      "end_time": "2026-09-20T00:15:08.100Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "execute_tool",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.tool.name": "tool-read-mcp-http"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "researcher-v2",
+      "metrics": {
+        "duration": {
+          "value": 1.5,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "query": "示例追踪方案证据回溯"
+        },
+        "output": {
+          "result": [
+            "evidence-02"
+          ]
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "000000000000006c",
+      "parent_span_id": "000000000000006a",
+      "run_id": "run-candidate",
+      "name": "补全主张证据映射",
+      "kind": "client",
+      "start_time": "2026-09-20T00:15:08.100Z",
+      "end_time": "2026-09-20T00:15:09.900Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-researcher",
+        "gen_ai.operation.name": "chat",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.request.model": "mock-reasoner-v1",
+        "gen_ai.provider.name": "mock-provider"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "researcher-v2",
+      "metrics": {
+        "duration": {
+          "value": 1.8,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 350,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0013,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": null
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "补全主张证据映射（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "000000000000006d",
+      "parent_span_id": "0000000000000065",
+      "run_id": "run-candidate",
+      "name": "核验员 · 重新核验",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:15:10.000Z",
+      "end_time": "2026-09-20T00:15:13.600Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 3.6,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "核验员 · 重新核验（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000073",
+      "parent_span_id": "000000000000006d",
+      "run_id": "run-candidate",
+      "name": "重新核验补充证据",
+      "kind": "client",
+      "start_time": "2026-09-20T00:15:10.100Z",
+      "end_time": "2026-09-20T00:15:13.300Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "mock-reasoner-v1",
+        "gen_ai.provider.name": "mock-provider",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 3.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 400,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0014,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": null
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "重新核验补充证据（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "000000000000006e",
+      "parent_span_id": "000000000000006d",
+      "run_id": "run-candidate",
+      "name": "全部关键事实有支撑",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:15:13.400Z",
+      "end_time": "2026-09-20T00:15:13.600Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-verifier",
+        "gen_ai.operation.name": "validate_output",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "agent_studio.quality.verdict": "passed"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "verifier-v1",
+      "metrics": {
+        "duration": {
+          "value": 0.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "claim_ids": [
+            "claim-01",
+            "claim-02"
+          ],
+          "candidate_citation_ids": [
+            "evidence-01",
+            "evidence-02"
+          ]
+        },
+        "output": {
+          "verdict": "passed",
+          "coverage": "2/2",
+          "mapping": {
+            "claim-01": [
+              "evidence-01"
+            ],
+            "claim-02": [
+              "evidence-02"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "000000000000006f",
+      "parent_span_id": "0000000000000065",
+      "run_id": "run-candidate",
+      "name": "撰稿员",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:15:13.600Z",
+      "end_time": "2026-09-20T00:15:18.200Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-writer",
+        "gen_ai.operation.name": "invoke_agent",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "writer-v1",
+      "metrics": {
+        "duration": {
+          "value": 4.6,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "撰稿员（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000070",
+      "parent_span_id": "000000000000006f",
+      "run_id": "run-candidate",
+      "name": "生成带证据简报",
+      "kind": "client",
+      "start_time": "2026-09-20T00:15:13.800Z",
+      "end_time": "2026-09-20T00:15:17.900Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-writer",
+        "gen_ai.operation.name": "chat",
+        "agent_studio.data.provenance": "synthetic_fixture",
+        "gen_ai.request.model": "mock-writer-v1",
+        "gen_ai.provider.name": "mock-provider"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": "writer-v1",
+      "metrics": {
+        "duration": {
+          "value": 4.1,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": 750,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": 0.0028,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": null
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "生成带证据简报（模拟输出）"
+        }
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "trace_id": "a11ce000000000000000000000000002",
+      "span_id": "0000000000000071",
+      "parent_span_id": "000000000000006f",
+      "run_id": "run-candidate",
+      "name": "格式与内容校验完成",
+      "kind": "internal",
+      "start_time": "2026-09-20T00:15:17.900Z",
+      "end_time": "2026-09-20T00:15:18.200Z",
+      "status": {
+        "code": "ok",
+        "message": null
+      },
+      "attributes": {
+        "agent_studio.node.id": "node-output",
+        "gen_ai.operation.name": "validate_output",
+        "agent_studio.data.provenance": "synthetic_fixture"
+      },
+      "events": [],
+      "links": [],
+      "config_version": "team-v2-candidate",
+      "member_version": null,
+      "metrics": {
+        "duration": {
+          "value": 0.3,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "tokens": {
+          "value": null,
+          "unit": "tokens",
+          "provenance": "synthetic_fixture"
+        },
+        "cost": {
+          "value": null,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "missing_reason": "not_a_model_call"
+      },
+      "payload": {
+        "capture_status": "recorded_fixture",
+        "input": {
+          "task": "比较两个示例追踪方案的证据回溯能力"
+        },
+        "output": {
+          "summary": "格式与内容校验完成（模拟输出）"
+        }
+      }
+    }
+  ],
+  "datasets": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "dataset-v1",
+      "name": "研究证据回归集",
+      "immutable": true,
+      "version": "1",
+      "cases": [
+        {
+          "id": "case-valid-evidence",
+          "title": "正常研究：关键事实均有依据",
+          "layer": "team_e2e",
+          "input": {
+            "task": "汇总给定文档中的功能"
+          },
+          "expected": "关键事实与引用逐条匹配"
+        },
+        {
+          "id": "case-missing-evidence",
+          "title": "引用存在，但没有支撑关键结论",
+          "layer": "regression",
+          "input": {
+            "task": "比较两个示例追踪方案"
+          },
+          "expected": "补查未被来源支撑的主张，失败则明确未知",
+          "origin_run_id": "run-baseline",
+          "origin_span_id": "0000000000000008"
+        },
+        {
+          "id": "case-missing-input",
+          "title": "缺少必填研究问题",
+          "layer": "agent_task",
+          "input": {},
+          "expected": "澄清一次，不启动检索"
+        },
+        {
+          "id": "case-return-loop",
+          "title": "核验退回后补查并重新验证",
+          "layer": "team_e2e",
+          "input": {
+            "task": "补齐示例证据缺口"
+          },
+          "expected": "最多退回一次，补查后重新核验"
+        },
+        {
+          "id": "case-conflicting-sources",
+          "title": "两个来源给出冲突结论",
+          "layer": "regression",
+          "input": {
+            "task": "处理示例来源冲突"
+          },
+          "expected": "指出冲突并请求人工选择证据标准"
+        },
+        {
+          "id": "case-source-unavailable",
+          "title": "无法获得原始来源",
+          "layer": "tool_contract",
+          "input": {
+            "task": "核验不可访问的原始来源"
+          },
+          "expected": "记录证据不足，不能当成通过"
+        }
+      ]
+    }
+  ],
+  "evaluator_versions": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "code-evidence-v1",
+      "kind": "code",
+      "label": "关键事实证据覆盖",
+      "immutable": true,
+      "rule": "Every key claim must have supporting evidence; citation count alone is insufficient.",
+      "code_version": "fixture-rule-1",
+      "model_id": null
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "code-budget-v1",
+      "kind": "code",
+      "label": "预算与输入契约",
+      "immutable": true,
+      "rule": "Validate required input; complete or escalate within configured mock budget.",
+      "code_version": "fixture-rule-1",
+      "model_id": null
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "llm-grounding-v1",
+      "kind": "llm",
+      "label": "事实与证据一致性",
+      "immutable": true,
+      "model_id": "mock-judge-v1",
+      "rubric": {
+        "supported_claims": "逐条事实是否获得证据支撑",
+        "conflicts": "是否说明来源冲突",
+        "uncertainty": "是否保留无法判定项"
+      },
+      "threshold": 0.8,
+      "code_version": null
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "human-review-v1",
+      "kind": "human",
+      "label": "人工证据复核",
+      "immutable": true,
+      "model_id": null,
+      "criteria": "核对引用实际支撑的事实，记录与机器评价的分歧。"
+    }
+  ],
+  "suites": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "suite-v1",
+      "name": "证据与交接验收",
+      "immutable": true,
+      "dataset_id": "dataset-v1",
+      "evaluator_versions": [
+        "code-evidence-v1",
+        "code-budget-v1",
+        "llm-grounding-v1",
+        "human-review-v1"
+      ],
+      "runner_connection": "unconnected",
+      "aggregation_policy": "hard_code_fail_or_human_fail_overrides_llm_pass; insufficient_evidence_remains_unknown; judge_error_not_agent_failure"
+    }
+  ],
+  "evaluations": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "eval-baseline-code",
+      "subject": {
+        "type": "span",
+        "run_id": "run-baseline",
+        "span_id": "0000000000000008"
+      },
+      "evaluator_version": "code-evidence-v1",
+      "status": "failed",
+      "score": null,
+      "actual": {
+        "supported_key_claims": 1,
+        "total_key_claims": 2
+      },
+      "expected": {
+        "supported_key_claims": 2,
+        "total_key_claims": 2
+      },
+      "evidence_ids": [
+        "evidence-01"
+      ],
+      "reason": "claim-02 没有支持证据。",
+      "judge_error": null
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "eval-baseline-llm",
+      "subject": {
+        "type": "run",
+        "run_id": "run-baseline"
+      },
+      "evaluator_version": "llm-grounding-v1",
+      "status": "passed",
+      "score": 0.84,
+      "score_provenance": "synthetic_fixture",
+      "evidence_ids": [
+        "evidence-01"
+      ],
+      "reason": "演示 Judge 误把存在引用视为全部事实被支撑。",
+      "judge_error": null,
+      "cost": {
+        "value": 0.0008,
+        "unit": "USD",
+        "provenance": "synthetic_fixture"
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "eval-baseline-human",
+      "subject": {
+        "type": "run",
+        "run_id": "run-baseline"
+      },
+      "evaluator_version": "human-review-v1",
+      "status": "failed",
+      "score": null,
+      "evidence_ids": [
+        "evidence-01"
+      ],
+      "reason": "引用只支撑第一条主张，不同意模型评价。",
+      "disagrees_with": "eval-baseline-llm",
+      "judge_error": null
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "eval-candidate-code",
+      "subject": {
+        "type": "span",
+        "run_id": "run-candidate",
+        "span_id": "000000000000006e"
+      },
+      "evaluator_version": "code-evidence-v1",
+      "status": "passed",
+      "score": null,
+      "actual": {
+        "supported_key_claims": 2,
+        "total_key_claims": 2
+      },
+      "expected": {
+        "supported_key_claims": 2,
+        "total_key_claims": 2
+      },
+      "evidence_ids": [
+        "evidence-01",
+        "evidence-02"
+      ],
+      "reason": "两条关键事实均有支持证据。",
+      "judge_error": null
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "eval-candidate-llm",
+      "subject": {
+        "type": "run",
+        "run_id": "run-candidate"
+      },
+      "evaluator_version": "llm-grounding-v1",
+      "status": "passed",
+      "score": 0.91,
+      "score_provenance": "synthetic_fixture",
+      "evidence_ids": [
+        "evidence-01",
+        "evidence-02"
+      ],
+      "reason": "补充来源支持第二条主张。",
+      "judge_error": null,
+      "cost": {
+        "value": 0.0011,
+        "unit": "USD",
+        "provenance": "synthetic_fixture"
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "eval-judge-error",
+      "subject": {
+        "type": "case",
+        "case_id": "case-conflicting-sources"
+      },
+      "evaluator_version": "llm-grounding-v1",
+      "status": "judge_error",
+      "score": null,
+      "evidence_ids": [],
+      "reason": "Judge 自身失败，不计为智能体零分。",
+      "judge_error": {
+        "code": "MOCK_TIMEOUT",
+        "message": "模拟 Judge 超时"
+      },
+      "cost": {
+        "value": null,
+        "unit": "USD",
+        "provenance": "synthetic_fixture"
+      }
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "eval-insufficient",
+      "subject": {
+        "type": "case",
+        "case_id": "case-source-unavailable"
+      },
+      "evaluator_version": "human-review-v1",
+      "status": "insufficient_evidence",
+      "score": null,
+      "evidence_ids": [],
+      "reason": "无法访问原始来源，无法判定。",
+      "judge_error": null
+    }
+  ],
+  "comparisons": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "comparison-v1-v2",
+      "dataset_id": "dataset-v1",
+      "suite_id": "suite-v1",
+      "baseline_version": "team-v1",
+      "candidate_version": "team-v2-candidate",
+      "baseline_run_id": "run-baseline",
+      "candidate_run_id": "run-candidate",
+      "result_origin": "preauthored_design_fixture_not_executed",
+      "summary": {
+        "case_count": 6,
+        "baseline": {
+          "passed": 2,
+          "failed": 3,
+          "insufficient_evidence": 1
+        },
+        "candidate": {
+          "passed": 4,
+          "failed": 1,
+          "insufficient_evidence": 1
+        },
+        "improved": 2,
+        "regressed": 0,
+        "unchanged": 3,
+        "undetermined": 1
+      },
+      "rows": [
+        {
+          "case_id": "case-valid-evidence",
+          "baseline_status": "passed",
+          "candidate_status": "passed",
+          "change": "unchanged",
+          "basis": "preauthored_fixture_not_executed"
+        },
+        {
+          "case_id": "case-missing-evidence",
+          "baseline_status": "failed",
+          "candidate_status": "passed",
+          "change": "improved",
+          "basis": "preauthored_fixture_not_executed"
+        },
+        {
+          "case_id": "case-missing-input",
+          "baseline_status": "passed",
+          "candidate_status": "passed",
+          "change": "unchanged",
+          "basis": "preauthored_fixture_not_executed"
+        },
+        {
+          "case_id": "case-return-loop",
+          "baseline_status": "failed",
+          "candidate_status": "passed",
+          "change": "improved",
+          "basis": "preauthored_fixture_not_executed"
+        },
+        {
+          "case_id": "case-conflicting-sources",
+          "baseline_status": "failed",
+          "candidate_status": "failed",
+          "change": "unchanged",
+          "basis": "preauthored_fixture_not_executed"
+        },
+        {
+          "case_id": "case-source-unavailable",
+          "baseline_status": "insufficient_evidence",
+          "candidate_status": "insufficient_evidence",
+          "change": "undetermined",
+          "basis": "preauthored_fixture_not_executed"
+        }
+      ],
+      "performance_scope": "single_evidence_case_not_entire_suite",
+      "performance": {
+        "baseline_seconds": {
+          "value": 14.8,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "candidate_seconds": {
+          "value": 18.2,
+          "unit": "seconds",
+          "provenance": "synthetic_fixture"
+        },
+        "baseline_cost": {
+          "value": 0.0064,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        },
+        "candidate_cost": {
+          "value": 0.0081,
+          "unit": "USD",
+          "provenance": "synthetic_fixture"
+        }
+      },
+      "promotion": {
+        "default_version": "team-v1",
+        "candidate_promoted": false,
+        "remaining_issues": [
+          "case-conflicting-sources",
+          "case-source-unavailable"
+        ]
+      }
+    }
+  ],
+  "configuration_issue_examples": [
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "issue-missing-input",
+      "kind": "missing_input",
+      "target": "node-input",
+      "message": "task 为必填字段。"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "issue-edge-type",
+      "kind": "invalid_mapping",
+      "target": "edge-research-verify",
+      "message": "sources 需要数组，收到字符串（错误示例）。"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "issue-tool-unconnected",
+      "kind": "unconnected_tool",
+      "target": "tool-search-http",
+      "message": "工具未连接，仅可使用模拟数据。"
+    },
+    {
+      "synthetic": true,
+      "model_called": false,
+      "id": "issue-unsupported-model-parameter",
+      "kind": "unsupported_model_parameter",
+      "target": "mock-reasoner-v1",
+      "message": "演示推理模型不支持 temperature；实际能力以提供方为准。"
+    }
+  ],
+  "interaction_contract": {
+    "save_draft": "create_mutable_draft_without_changing_default",
+    "run_version": "explicit_version_with_mock_tools_only",
+    "promote_candidate": "local_design_state_only_no_real_deploy",
+    "replay_history": "read_only",
+    "rerun": "explicit_execution_mode_required_actual_tools_disabled",
+    "trace_to_case": {
+      "source_run": "run-baseline",
+      "source_span": "0000000000000008",
+      "target_case": "case-missing-evidence",
+      "expected_field_required": true
+    },
+    "hidden_chain_of_thought": "never_display_or_fabricate"
+  }
+}

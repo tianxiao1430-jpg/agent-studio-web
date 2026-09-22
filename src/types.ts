@@ -1,0 +1,33 @@
+import type fixture from './data/demo-data.json';
+import type { Dispatch, SetStateAction } from 'react';
+export type Screen = 'home' | 'requirements' | 'canvas' | 'scaffold' | 'playground' | 'trace' | 'evals' | 'compare' | 'resources' | 'runs';
+export type AgentConfig = {
+ input:{required_fields:string[];normalization:string[];missing_fields:string;fields:Record<string,string>};
+ guardrails:{input:string;tool_arguments:string;tool_results:string;output:string;on_failure:string};
+ grounding:{source_ids:string[];retrieval:string;rerank:string;freshness_days:number;require_citations:boolean;on_insufficient_evidence:string};
+ instructions:{system:string;task_template:string;skill_ids:string[];effective_preview_available:boolean};
+ context:{history:string;budget_tokens:number;compression:string;private_memory:string;shared_memory:string;shared_write_scope:string[]};
+ model:{provider_id:string;model_id:string;capabilities_source:string;reasoning_effort:string|null;temperature:number|null;max_output_tokens:number;timeout_seconds:number;fallback_model_id:string|null;unsupported_parameters:string[];connection_status:string};
+ tools:{allowed_ids:string[];approval:string;retry_count:number;default_timeout_seconds:number};
+ loop:{strategy:string;continue_when:string;stop_when:string;max_steps:number;timeout_seconds:number;cost_limit_usd:number;no_progress_limit:number;observable_only:boolean};
+ output:{format:string;fields:string[];schema_validation:boolean;content_validation:string;repair_action:string;repair_limit:number;on_exhausted:string};
+};
+export type GraphNode = {id:string;kind:string;label:string;position:{x:number;y:number};agent_id?:string;enforcement?:string};
+export type GraphEdge = {id:string;source:string;target:string;kind:string;mapping:Record<string,string>;condition:string;timeout?:number;maxReturns?:number};
+export type Requirements = {purpose:string;audience:string;scope:string;input:string;actions:string;output:string;acceptance:string;failure:string};
+export type Draft = {id:string;name:string;sourceVersion:string;nodes:GraphNode[];edges:GraphEdge[];configs:Record<string,AgentConfig>;requirements:Requirements;budget:{maxSeconds:number;maxCost:number;maxReturns:number;concurrency:number};viewport:{x:number;y:number;zoom:number}};
+export type Snapshot = {id:string;name:string;createdAt:string;draft:Draft};
+export type Run = Omit<typeof fixture.runs[number], 'metrics'> & {metrics:{duration:{value:number|null;unit:string;provenance:string};tokens:{value:number|null;unit:string;provenance:string};cost:{value:number|null;unit:string;provenance:string}};snapshot?:Snapshot;scenario?:string;playedEvents?:number;fixtureSource?:string};
+export type Span = typeof fixture.spans[number];
+export type TestCase = typeof fixture.datasets[number]['cases'][number];
+export type Issue = {id:string;severity:'error'|'warning';title:string;detail:string;nodeId?:string};
+export type State = {schemaVersion:1;draft:Draft;savedDraft:Draft;savedAt:string|null;versions:Snapshot[];defaultVersion:string;runs:Run[];customCases:TestCase[];manualReviews:{runId:string;spanId:string;verdict:string;note:string;createdAt:string}[]};
+export type StudioApi = {
+ state:State; draft:Draft; setDraft:Dispatch<SetStateAction<Draft>>;screen:Screen;navigate:(screen:Screen)=>void;
+ selectedNode:string|null;selectNode:(id:string|null)=>void;selectedRun:string;selectRun:(id:string)=>void;
+ selectedSpan:string;selectSpan:(id:string)=>void; notify:(message:string)=>void;
+ saveDraft:()=>void;openVersion:(id:string)=>void;repairDraft:(run:Run)=>void;promote:(id:string)=>void;
+ addRun:(run:Run)=>void;updateRun:(id:string,patch:Partial<Run>)=>void;
+ addReview:(review:State['manualReviews'][number])=>void;addCase:(testCase:TestCase)=>void;
+ exportData:()=>void;issues:Issue[];checkConfig:()=>void;
+};
