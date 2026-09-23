@@ -12,7 +12,6 @@ Agent Studio Web：一个**个人使用的智能体工作台 UI 原型**。用�
 
 - **不要把模拟伪装成真实。** 所有运行结果、Trace、评分、指标都是演示数据。未接入真实执行引擎前，这类 UI 必须带"模拟/演示"标识。详见 `docs/PRODUCT_BOUNDARIES.md`。
 - **不要引入后端。** 不装数据库、不加 API 服务、不接模型调用、不放任何密钥。除非用户明确要求。
-- **不要改启动方式。** 保持 `./start.sh` 前台运行、只监听 127.0.0.1:4173。不加守护进程、开机启动或后台常驻。
 - **不要碰 Sites 交接文件。** `.openai/hosting.json`、`worker/index.js`、`scripts/prepare-sites-build.mjs`、`tests/sites-worker.test.mjs` 是给 Sites 部署预留的，改动前先问。
 
 ## 结构指引
