@@ -22,9 +22,18 @@ Agent Studio Web：一个**个人使用的智能体工作台 UI 原型**。用�
 - `qa/` — 关键界面的截图证据，做视觉改动后更新对应截图。
 - `README.md` — 给人看的项目说明；`ROADMAP.md` — 方向与 use case；`docs/PRODUCT_BOUNDARIES.md` — 模拟 vs 真实的判定规则。
 
+## 认领机制（多智能体怎么分工）
+
+认领规则只在本文档维护，其它文件只引用不重复。
+
+- **先认领，再动工。** 任何非微小改动前，先在 GitHub 开一个 issue：标题写对应的 UC 编号和条目（如 "UC3：自定义输入的完整模拟轨迹"），正文说明打算改哪些**页面组件**（不是文件）。这避免两个 Agent 撞同一组件。
+- **认领 = issue + assign/标注。** 开 issue 后把自己 assign 上去，或在正文明确写"认领"。已有他人 assign 的 issue 不要重复动工。
+- **改动走 issue → PR 流程。** 每个改动先开 issue，再开分支、提 PR 并关联 issue（PR 正文 `Closes #N`），合并后才算完成。不要直接提交到 main。
+- **任务按页面组件拆分。** 认领时说清改哪个组件；跨页面共享的状态形状必须走 `src/types.ts` + `src/domain.ts`。
+
 ## 技术约定（多 Agent 并行时最容易各自发明的部分）
 
-- **任务按页面组件拆分，不按文件拆分。** `Canvas.tsx` / `ConfigPages.tsx` / `ObservePages.tsx` 各含多个页面组件，两个任务撞同一文件是常态。认领任务时说清改哪个组件，跨页面共享的状态形状必须走 `src/types.ts` + `src/domain.ts`。
+- **任务按页面组件拆分，不按文件拆分。** `Canvas.tsx` / `ConfigPages.tsx` / `ObservePages.tsx` 各含多个页面组件，两个任务撞同一文件是常态（认领方式见上文"认领机制"）。
 - **状态只有一个入口。** `App.tsx` 集中持有全部状态，通过 `StudioApi` prop 传递；`setDraft` 是改草稿的唯一入口；localStorage 持久化只允许在 `App.tsx`。UI 局部状态（面板开关、撤销栈等）留在组件内部，不要塞进 draft（会污染快照和 dirty 判断）。
 - **样式按页面文件放。** 类名前缀跟随页面（`canvas-` / `config-` / `obs-`），颜色、圆角、字号只能用 `docs/DESIGN.md` 令牌表里的值。
 - **组件分级。** `src/ui.tsx` 是共享原语（Icon/Badge/Button/Field/Modal/Status/Empty）；页面内的局部辅助组件留在页面文件里；一个组件被第二个页面使用时才提升到 `ui.tsx`。
