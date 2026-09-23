@@ -13,7 +13,7 @@ function download(value:string,name:string){const url=URL.createObjectURL(new Bl
 const readLocal=()=>{try{return restoreState(localStorage.getItem(STORAGE_KEY))}catch{return {state:initialState(),error:'浏览器不允许访问本地存储。可以继续编辑，并导出 JSON 保存。'}}};
 export function App(){
  const [initial]=useState(readLocal);const [state,setState]=useState<State>(initial.state);const [storageError,setStorageError]=useState(initial.error);const [preserveCorrupt,setPreserveCorrupt]=useState(!!initial.error);
- const [screen,setScreen]=useState<Screen>('canvas');const [selectedNode,selectNode]=useState<string|null>(null);const [selectedRun,selectRun]=useState('run-candidate');const [selectedSpan,selectSpan]=useState('000000000000006e');
+ const [screen,setScreen]=useState<Screen>('canvas');const [selectedNode,selectNode]=useState<string|null>(null);const [selectedRun,selectRun]=useState<string|null>('run-candidate');const [selectedSpan,selectSpan]=useState('000000000000006e');
  const [toast,setToast]=useState('');const [modal,setModal]=useState<'issues'|'backup'|'new'|null>(null);const [newName,setNewName]=useState('');const [newKind,setNewKind]=useState('team');const [query,setQuery]=useState('');const [imported,setImported]=useState<State|null>(null);
  const [navExpanded,setNavExpanded]=useState(false);
  const pageBody=useRef<HTMLDivElement>(null);useEffect(()=>{pageBody.current?.scrollTo(0,0)},[screen]);

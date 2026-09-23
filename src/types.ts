@@ -24,7 +24,7 @@ export type Issue = {id:string;severity:'error'|'warning';title:string;detail:st
 export type State = {schemaVersion:1;draft:Draft;savedDraft:Draft;savedAt:string|null;versions:Snapshot[];defaultVersion:string;runs:Run[];customCases:TestCase[];manualReviews:{runId:string;spanId:string;verdict:string;note:string;createdAt:string}[]};
 export type StudioApi = {
  state:State; draft:Draft; setDraft:Dispatch<SetStateAction<Draft>>;screen:Screen;navigate:(screen:Screen)=>void;
- selectedNode:string|null;selectNode:(id:string|null)=>void;selectedRun:string;selectRun:(id:string)=>void;
+ selectedNode:string|null;selectNode:(id:string|null)=>void;selectedRun:string|null;selectRun:(id:string|null)=>void;
  selectedSpan:string;selectSpan:(id:string)=>void; notify:(message:string)=>void;
  saveDraft:()=>void;openVersion:(id:string)=>void;repairDraft:(run:Run)=>void;promote:(id:string)=>void;
  addRun:(run:Run)=>void;updateRun:(id:string,patch:Partial<Run>)=>void;
